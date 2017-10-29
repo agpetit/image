@@ -1,0 +1,11 @@
+<?xml version="1.0"?>
+<Node 	name="root" gravity="0 0 0" dt="0.03"  >
+  <RequiredPlugin pluginName="image"/>
+  <Kinect  name="SoftKinetic"  transform="0 0 0 0 0 0 .001 .001 1 0 1 1" depthTransform="0 0 0 0 0 0 .001 .001 1 0 1 1" tiltAngle="0" />
+<!--  <ImageViewer  name="viewer" image="@Kinect.image" transform="0 0 0 0 0 0 .001 .001 1 0 1 1"  />
+  <ImageViewer template="ImageUS" name="viewer2" image="@Kinect.depthImage" transform="1 0 0 0 0 0 .001 .001 1 0 1 1"/>
+-->
+  <ImageViewer  name="viewer" image="@SoftKinetic.image" transform="1 0 0 0 0 0 .001 .001 1 0 1 1"  />
+  <ImageViewer template="ImageF" name="viewer2" image="@SoftKinetic.depthImage" transform="2 0 0 0 0 0 .001 .001 1 0 1 1"/>
+
+</Node>
