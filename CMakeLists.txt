@@ -30,6 +30,7 @@ set(SOURCE_FILES
     TransferFunction.cpp
     VoronoiToMeshEngine.cpp
     initImage.cpp
+    RealSenseCam.cpp
 )
 
 set(HEADER_FILES
@@ -57,6 +58,7 @@ set(HEADER_FILES
     TransferFunction.h
     VectorVis.h
     VoronoiToMeshEngine.h
+    RealSenseCam.h
 )
 
 
@@ -106,18 +108,21 @@ if(FREENECT_FOUND)
     list(APPEND SOURCE_FILES Kinect.cpp)
     message(STATUS "image: found the freenect library")
 else()
-    message(STATUS "image: could not find the freenect library, won't build the Kinect component")
+    message(STATUS "image: could not find the freenect library, won't build the realsense component")
+endif()
+
+find_package(OpenCV QUIET)
+
+find_package(realsense2 QUIET)
+if(realsense2_FOUND)
+    list(APPEND HEADER_FILES RealSenseCam.h)
+    list(APPEND SOURCE_FILES RealSenseCam.cpp)
+    message(STATUS "image: found the realsense library")
+else()
+    message(STATUS "image: could not find the realsense library, won't build the realsense component")
 endif()
 
 # todo?
-
-# if(SOFA-EXTERNAL_OPENCV)
-# AddLinkerDependencies("ml")
-# AddLinkerDependencies("cvaux")
-# AddLinkerDependencies("highgui")
-# AddLinkerDependencies("cv")
-# AddLinkerDependencies("cxcore")
-# endif()
 
 # OpenMP is bugged in image, forcing it to be single threaded for now
 if(SOFA_OPENMP)
@@ -139,6 +144,15 @@ if(FREENECT_FOUND)
     target_link_libraries(${PROJECT_NAME} freenect_sync)
 endif()
 
+if(OPENCV_FOUND)
+    target_link_libraries(${PROJECT_NAME} ${OpenCV_LIBS})
+endif()
+
+if(realsense2_FOUND)
+link_directories(${realsense2_LIBRARY})
+target_link_libraries(${PROJECT_NAME} ${realsense2_LIBRARY})
+endif()
+
 target_include_directories(${PROJECT_NAME} PUBLIC "$<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/include>")
 target_include_directories(${PROJECT_NAME} PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/..>")
 target_include_directories(${PROJECT_NAME} PUBLIC "$<BUILD_INTERFACE:${CImg_INCLUDE_DIRS}>")
@@ -146,6 +160,16 @@ target_include_directories(${PROJECT_NAME} PUBLIC "$<INSTALL_INTERFACE:include>"
 if(FREENECT_FOUND)
     target_include_directories(${PROJECT_NAME} PUBLIC "${FREENECT_INCLUDE_DIR}")
 endif()
+
+
+if(OPENCV_FOUND)
+    target_include_directories(${PROJECT_NAME} PUBLIC "${OpenCV_INCLUDE_DIRS}")
+endif()
+
+if(realsense2_FOUND)
+    target_include_directories(${PROJECT_NAME} PUBLIC "${realsense_INCLUDE_DIR}")
+endif()
+
 set_target_properties(${PROJECT_NAME} PROPERTIES VERSION ${IMAGE_VERSION})
 set_target_properties(${PROJECT_NAME} PROPERTIES PUBLIC_HEADER "${HEADER_FILES}")
 

@@ -25,7 +25,7 @@
 #ifndef IMAGE_REALSENSECAM_H
 #define IMAGE_REALSENSECAM_H
 
-#include <librealsense/rs.hpp>
+#include <librealsense2/rs.hpp>
 #include <opencv2/opencv.hpp>
 #include <opencv2/highgui.hpp>
 #include <iostream>
@@ -44,8 +44,8 @@
 #include <sofa/core/visual/VisualParams.h>
 #include <sofa/defaulttype/BoundingBox.h>
 #include <sofa/core/objectmodel/Event.h>
-#include <sofa/simulation/common/AnimateBeginEvent.h>
-#include <sofa/simulation/common/AnimateEndEvent.h>
+#include <sofa/simulation/AnimateBeginEvent.h>
+#include <sofa/simulation/AnimateEndEvent.h>
 #include <sofa/defaulttype/Mat.h>
 #include <sofa/defaulttype/Quat.h>
 #include <sofa/helper/rmath.h>
