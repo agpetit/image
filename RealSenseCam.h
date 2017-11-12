@@ -35,8 +35,7 @@
 #include <boost/thread.hpp>
 #include <sys/times.h>
 
-
-#include "initImage.h"
+#include <image/config.h>
 #include "ImageTypes.h"
 #include <sofa/defaulttype/Vec.h>
 #include <sofa/core/objectmodel/BaseObject.h>
@@ -50,6 +49,10 @@
 #include <sofa/defaulttype/Quat.h>
 #include <sofa/helper/rmath.h>
 #include <sofa/helper/OptionsGroup.h>
+
+#include <fstream>
+#include <algorithm>
+#include <cstring>
 
 #ifdef Success
   #undef Success
@@ -72,7 +75,8 @@ using defaulttype::Vector3;
 using namespace std;
 using namespace cv;
 using namespace boost;
-using namespace rs;
+using namespace rs2;
+
 
 void* globalRealSenseCamClassPointer;
 
@@ -126,25 +130,19 @@ cv::Mat_<cv::Vec3f> points3d;
 
 int niterations;
 
-// Window size and frame rate
-int INPUT_WIDTH;
-int INPUT_HEIGHT;
-int FRAMERATE;
+// Declare depth colorizer for pretty visualization of depth data
+rs2::colorizer color_map;
 
-// Named windows
-char* WINDOW_DEPTH;
-char* WINDOW_RGB;
+// Declare RealSense pipeline, encapsulating the actual device and sensors
+rs2::pipeline pipe;
+// Start streaming with default recommended configuration
 
 
-context 	_rs_ctx;
-device* 	_rs_camera;
-intrinsics 	_depth_intrin;
-intrinsics  _color_intrin;
-bool 		_loop = true;
-
+// Using the context to create a rs2::align object.
+// rs2::align allows you to perform aliment of depth frames to others
 
 public:
-  
+
 RealSenseCam();// : Inherited();
 virtual void clear();
 virtual ~RealSenseCam();
@@ -157,69 +155,168 @@ virtual void init();
 
 
 protected:
-	
+
+void acquireRaw()
+{
+
+    rs2::frameset data;
+    data = pipe.wait_for_frames(); // Wait for next set of frames from the camera
+
+    rs2::video_frame depth = data.get_depth_frame(); // Find and colorize the depth data
+
+    // Create color image
+    rs2::video_frame color = data.get_color_frame();            // Find the color data
+
+    cv::Mat rgb,depth8u,depth16;
+
+    int widthd, heightd, widthc, heightc;
+
+    // Create depth image
+    if (depth && color){
+
+     widthd = depth.get_width();
+     heightd = depth.get_height();
+
+     cv::Mat depth160( heightd, widthd, CV_16U, (void*)depth.get_data() );
+
+     depth16=depth160;
+
+     widthc = color.get_width();
+     heightc = color.get_height();
+
+     cv::Mat rgb0(heightc,widthc, CV_8UC3, (void*) color.get_data());
+
+     rgb=rgb0;
+
+     depth8u = depth16;
+     depth8u.convertTo( depth8u, CV_8UC1, 255.0/1000);
+
+
+
+    // Read the color buffer and display
+    int32_t w, h, w_depth, h_depth;
+
+    w = widthc;
+    h = heightc;
+    w_depth = widthd;
+    h_depth = heightd;
+    waImage wimage(this->imageO);
+    CImg<T>& img =wimage->getCImg(0);
+    //img.resize(widthc,heightc,1,3);
+
+    waDepth wdepth(this->depthImage);
+    waTransform wdt(this->depthTransform);
+    CImg<dT>& depthimg =wdepth->getCImg(0);
+    //depthimg.resize(widthd,heightd,1,1);
+
+
+    cv::Mat bgr_image;
+    cvtColor (rgb, bgr_image, CV_RGB2BGR);
+
+            if(img.spectrum()==3)
+            {
+            unsigned char* rgb0 = (unsigned char*)bgr_image.data;
+            //unsigned char* rgb0 = (unsigned char*)color.get_data();
+            unsigned char *ptr_r = img.data(0,0,0,2), *ptr_g = img.data(0,0,0,1), *ptr_b = img.data(0,0,0,0);
+            for ( int siz = 0 ; siz<img.width()*img.height(); siz++)    { *(ptr_r++) = *(rgb0++); *(ptr_g++) = *(rgb0++); *(ptr_b++) = *(rgb0++);
+                        }
+            }
+            else memcpy(img.data(),  bgr_image.data, img.width()*img.height()*sizeof(T));
+
+    waImage wimage1(this->imageO);
+    CImg<T>& img1 =wimage1->getCImg(0);
+
+    memcpy(depthimg.data(), (float*)depth16.data , w_depth*h_depth*sizeof(float));
+}
+
+
+}
+
+void acquireAligned()
+{
+    rs2::align align(RS2_STREAM_COLOR);
+
+    rs2::frameset frameset;
+
+    while (!frameset.first_or_default(RS2_STREAM_DEPTH) || !frameset.first_or_default(RS2_STREAM_COLOR))
+    {
+        frameset = pipe.wait_for_frames();
+    }
+
+    auto proccessed = align.proccess(frameset);
+
+   // Trying to get both color and aligned depth frames
+    rs2::video_frame color = proccessed.get_color_frame();
+    rs2::depth_frame depth = proccessed.get_depth_frame();
+
+    cv::Mat rgb,depth8u,depth16;
+
+    int widthd, heightd, widthc, heightc;
+
+    // Create depth image
+    if (depth && color){
+
+    widthd = depth.get_width();
+    heightd = depth.get_height();
+
+    cv::Mat depth160( heightd, widthd, CV_16U, (void*)depth.get_data() );
+    depth16=depth160;
+
+    widthc = color.get_width();
+    heightc = color.get_height();
+
+    cv::Mat rgb0(heightc,widthc, CV_8UC3, (void*) color.get_data());
+    rgb=rgb0;
+
+    depth8u = depth16;
+    depth8u.convertTo( depth8u, CV_8UC1, 255.0/1000 );
+
+    }
+
+    // Read the color buffer and display
+    int32_t w, h, w_depth, h_depth;
+
+    w = widthc;
+    h = heightc;
+    w_depth = widthd;
+    h_depth = heightd;
+
+    waImage wimage(this->imageO);
+    CImg<T>& img =wimage->getCImg(0);
+    img.resize(widthc,heightc,1,3);
+
+    waDepth wdepth(this->depthImage);
+    waTransform wdt(this->depthTransform);
+    CImg<dT>& depthimg =wdepth->getCImg(0);
+    depthimg.resize(widthd,heightd,1,1);
+
+
+    cv::Mat bgr_image;
+    cvtColor (rgb, bgr_image, CV_RGB2BGR);
+
+            if(img.spectrum()==3)
+            {
+            unsigned char* rgb0 = (unsigned char*)bgr_image.data;
+            //unsigned char* rgb = (unsigned char*)color.get_data();
+            unsigned char *ptr_r = img.data(0,0,0,2), *ptr_g = img.data(0,0,0,1), *ptr_b = img.data(0,0,0,0);
+            for ( int siz = 0 ; siz<img.width()*img.height(); siz++)    { *(ptr_r++) = *(rgb0++); *(ptr_g++) = *(rgb0++); *(ptr_b++) = *(rgb0++);
+                        }
+            }
+            else memcpy(img.data(),  bgr_image.data, img.width()*img.height()*sizeof(T));
+
+    memcpy(depthimg.data(), (float*)depth16.data , w_depth*h_depth*sizeof(float));
+
+
+}
+
 
 void handleEvent(sofa::core::objectmodel::Event *event)
     {
+if (dynamic_cast<simulation::AnimateEndEvent*>(event))
+{
+acquireRaw();
+}
 
-	// Get current frames intrinsic data.
-	_depth_intrin 	= _rs_camera->get_stream_intrinsics( rs::stream::depth );
-	_color_intrin 	= _rs_camera->get_stream_intrinsics( rs::stream::color );
-
-	// Create depth image
-	cv::Mat depth16( _depth_intrin.height,
-					 _depth_intrin.width,
-					 CV_16U,
-					 (uchar *)_rs_camera->get_frame_data( rs::stream::depth ) );
-
-	// Create color image
-	cv::Mat rgb( _color_intrin.height,
-				 _color_intrin.width,
-				 CV_8UC3,
-				 (uchar *)_rs_camera->get_frame_data( rs::stream::color ) );
-
-	// < 800
-	cv::Mat depth8u = depth16;
-	depth8u.convertTo( depth8u, CV_8UC1, 255.0/1000 );
-
-	    // Read the color buffer and display
-        int32_t w, h, w_depth, h_depth;
-	
-	w = 640;
-	h = 480;
-	w_depth = 640;
-	h_depth = 480;
-		
-	waImage wimage(this->imageO);
-	CImg<T>& img =wimage->getCImg(0);
-	
-	waDepth wdepth(this->depthImage);
-	waTransform wdt(this->depthTransform);
-	CImg<dT>& depthimg =wdepth->getCImg(0);	
-
-
-        cv::Mat bgr_image;
-        cvtColor (rgb, bgr_image, CV_RGB2BGR);
-		  
-		  if(img.spectrum()==3)  // deinterlace
-			{
-			unsigned char* rgb = (unsigned char*)bgr_image.data;
-			unsigned char *ptr_r = img.data(0,0,0,2), *ptr_g = img.data(0,0,0,1), *ptr_b = img.data(0,0,0,0);
-			for ( int siz = 0 ; siz<img.width()*img.height(); siz++)    { *(ptr_r++) = *(rgb++); *(ptr_g++) = *(rgb++); *(ptr_b++) = *(rgb++); 
-						}
-			}
-			else memcpy(img.data(),  bgr_image.data, img.width()*img.height()*sizeof(T));
-
-          memcpy(depthimg.data(), (float*)depth16.data , w_depth*h_depth*sizeof(float));
-	/*imshow( WINDOW_DEPTH, depth8u );
-	cvWaitKey( 1 );
-
-	cv::cvtColor( rgb, rgb, cv::COLOR_BGR2RGB );
-	imshow( WINDOW_RGB, rgb );
-	cvWaitKey( 1 );
-
-	return true;*/
-		
 }
 
 void getCorners(Vec<8,Vector3> &c) // get image corners
@@ -239,8 +336,8 @@ void getCorners(Vec<8,Vector3> &c) // get image corners
 
         raTransform rtransform(this->depthTransform);
         for(unsigned int i=0; i<p.size(); i++) c[i]=rtransform->fromImage(p[i]);
-		
-		//std::cout << " c0 " << c[0] << std::endl;
+
+        //std::cout << " c0 " << c[0] << std::endl;
     }
 
     virtual void computeBBox(const core::ExecParams*  params )
@@ -258,17 +355,17 @@ void getCorners(Vec<8,Vector3> &c) // get image corners
             }
         this->f_bbox.setValue(params,sofa::defaulttype::TBoundingBox<Real>(bbmin,bbmax));
     }
-	
+
 void draw(const core::visual::VisualParams* vparams)
     {
         // draw bounding box
 
 //std::cout << " depth cols " << depth.cols << std::endl;
-	
-	/*for (int i = 0; i<depth.rows; i++)
-		  for (int j = 0; j<depth.rows; j++)
-	  std::cout << (int)depth.at<uchar>(i,j) << std::endl;*/
-	  
+
+    /*for (int i = 0; i<depth.rows; i++)
+          for (int j = 0; j<depth.rows; j++)
+      std::cout << (int)depth.at<uchar>(i,j) << std::endl;*/
+
 
 /*cv::namedWindow("depth_softkinetic");
     cv::imshow("depth_softkinetic",	depth);
@@ -282,13 +379,13 @@ void draw(const core::visual::VisualParams* vparams)
       printf("Quitting main loop from OpenCV\n");
         context.quit();
     }*/
-	
+
         //if (!vparams->displayFlags().getShowVisualModels()) return;
         //if (!drawBB.getValue() && !drawGravity.getValue()) return;
 
         glPushAttrib( GL_LIGHTING_BIT | GL_ENABLE_BIT | GL_LINE_BIT );
         glPushMatrix();
-		
+
         if (drawBB.getValue())
         {
             const float color[]= {1.,0.5,0.5,0.}, specular[]= {0.,0.,0.,0.};
@@ -330,8 +427,8 @@ void draw(const core::visual::VisualParams* vparams)
 
 
 RealSenseCam::RealSenseCam() : Inherited()
-	        , depthImage(initData(&depthImage,DepthTypes(),"depthImage","depth map"))
-			, depthTransform(initData(&depthTransform, TransformType(), "depthTransform" , ""))
+            , depthImage(initData(&depthImage,DepthTypes(),"depthImage","depth map"))
+            , depthTransform(initData(&depthTransform, TransformType(), "depthTransform" , ""))
         , imageO(initData(&imageO,ImageTypes(),"image","image"))
         , transform(initData(&transform, TransformType(), "transform" , ""))
         , deviceID ( initData ( &deviceID,(unsigned int)0,"deviceID","device ID" ) )
@@ -346,30 +443,28 @@ RealSenseCam::RealSenseCam() : Inherited()
         , showArrowSize(initData(&showArrowSize,0.1f,"showArrowSize","size of the axis"))
     {
 
-    globalRealSenseCamClassPointer = (void*) this; 
-	drawBB = false;
-
-// Window size and frame rate
-INPUT_WIDTH 	= 320;
-INPUT_HEIGHT 	= 240;
-FRAMERATE 	= 60;
-
-// Named windows
-WINDOW_DEPTH = "Depth Image";
-WINDOW_RGB	 = "RGB Image";
-_rs_camera = NULL;
-_loop = true;
-
+    globalRealSenseCamClassPointer = (void*) this;
+    this->addAlias(&imageO, "inputImage");
+    this->addAlias(&transform, "inputTransform");
+    transform.setGroup("Transform");
+    depthTransform.setGroup("Transform");
+    f_listening.setValue(true);  // to update camera during animate
+    drawBB = false;
+    f_listening.setValue(true);  // to update camera during animate
     }
 
 
 void RealSenseCam::clear()
     {
+        waImage wimage(this->imageO);
+        wimage->clear();
+        waDepth wdepth(this->depthImage);
+        wdepth->clear();
     }
 
 RealSenseCam::~RealSenseCam()
     {
-
+	clear();
     }
 	
 /*----------------------------------------------------------------------------*/
@@ -377,46 +472,46 @@ RealSenseCam::~RealSenseCam()
 void RealSenseCam::init()
 {
 
+    pipe.start();
+    rs2::frameset data;
+    data = pipe.wait_for_frames(); // Wait for next set of frames from the camera
+    rs2::video_frame depth = data.get_depth_frame();
+    rs2::video_frame color = data.get_color_frame();
+    while(!depth || !color)
+    {
+    data = pipe.wait_for_frames(); // Wait for next set of frames from the camera
 
-	bool success = false;
-	if( _rs_ctx.get_device_count( ) > 0 )
-	{
-		_rs_camera = _rs_ctx.get_device( 0 );
-
-		_rs_camera->enable_stream( rs::stream::color, INPUT_WIDTH, INPUT_HEIGHT, rs::format::rgb8, FRAMERATE );
-		_rs_camera->enable_stream( rs::stream::depth, INPUT_WIDTH, INPUT_HEIGHT, rs::format::z16, FRAMERATE );
-
-		_rs_camera->start( );
-
-		success = true;
-	}
-	
-	/*if( !success )
-	{
-		std::cout << "Unable to locate a camera" << std::endl;
-		rs::log_to_console( rs::log_severity::fatal );
-		return EXIT_FAILURE;
-	}*/
-	
-	waDepth wdepth(this->depthImage);
-        waTransform wdt(this->depthTransform);
-	if(wdepth->isEmpty()) wdepth->getCImgList().push_back(CImg<dT>());
-	CImg<dT>& depthimg=wdepth->getCImg(0);
-	depthimg.resize(640,480,1,1);
-	
-	wdt->setCamPos((Real)(wdepth->getDimensions()[0]-1)/2.0,(Real)(wdepth->getDimensions()[1]-1)/2.0); // for perspective transforms
-	wdt->update(); // update of internal data
-	
-	waImage wimage(this->imageO);
-    waTransform wit(this->transform);
-	if(wimage->isEmpty()) wimage->getCImgList().push_back(CImg<T>());
-	CImg<T>& img = wimage->getCImg(0);
-    img.resize(640, 480,1,3);
-	
-	wit->setCamPos((Real)(wimage->getDimensions()[0]-1)/2.0,(Real)(wimage->getDimensions()[1]-1)/2.0); // for perspective transforms
-	wit->update(); // update of internal data
-
+    depth = data.get_depth_frame(); // Find and colorize the depth data
+    color = data.get_color_frame();            // Find the color data
     }
+
+    int widthd = depth.get_width();
+    int heightd = depth.get_height();
+
+    int widthc = color.get_width();
+    int heightc = color.get_height();
+
+    waDepth wdepth(this->depthImage);
+    waTransform wdt(this->depthTransform);
+    if(wdepth->isEmpty()) wdepth->getCImgList().push_back(CImg<dT>());
+    CImg<dT>& depthimg=wdepth->getCImg(0);
+    depthimg.resize(widthd,heightd,1,1);
+
+    wdt->setCamPos((Real)(wdepth->getDimensions()[0]-1)/2.0,(Real)(wdepth->getDimensions()[1]-1)/2.0); // for perspective transforms
+    wdt->update(); // update of internal data
+
+     waImage wimage(this->imageO);
+     waTransform wit(this->transform);
+    if(wimage->isEmpty()) wimage->getCImgList().push_back(CImg<T>());
+    CImg<T>& img = wimage->getCImg(0);
+    img.resize(widthc,heightc,1,3);
+
+    wit->setCamPos((Real)(wimage->getDimensions()[0]-1)/2.0,(Real)(wimage->getDimensions()[1]-1)/2.0); // for perspective transforms
+    wit->update(); // update of internal data
+
+    std::cout << " ok init " << std::endl;
+
+}
 
 
 }

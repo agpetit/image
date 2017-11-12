@@ -30,7 +30,6 @@ set(SOURCE_FILES
     TransferFunction.cpp
     VoronoiToMeshEngine.cpp
     initImage.cpp
-    RealSenseCam.cpp
 )
 
 set(HEADER_FILES
@@ -58,7 +57,6 @@ set(HEADER_FILES
     TransferFunction.h
     VectorVis.h
     VoronoiToMeshEngine.h
-    RealSenseCam.h
 )
 
 
@@ -76,10 +74,6 @@ if( SofaPython_FOUND )
     list(APPEND SOURCE_FILES python/Binding_ImageData.cpp)
     list(APPEND HEADER_FILES python/Binding_ImageData.h python/Binding_ImageData.inl)
 endif()
-
-
-
-
 
 find_package(SofaBase REQUIRED)
 find_package(SofaGeneral REQUIRED)
@@ -113,7 +107,7 @@ endif()
 
 find_package(OpenCV QUIET)
 
-find_package(realsense2 QUIET)
+find_package(realsense2)
 if(realsense2_FOUND)
     list(APPEND HEADER_FILES RealSenseCam.h)
     list(APPEND SOURCE_FILES RealSenseCam.cpp)
