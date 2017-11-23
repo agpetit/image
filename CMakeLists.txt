@@ -97,15 +97,6 @@ FIND_PACKAGE(VISP)
 #ENDIF(VISP_FOUND)
 LINK_DIRECTORIES(${VISP_LINK_DIRECTORIES})
 
-#FIND_PACKAGE(realsense2)
-
-include_directories("/home/antoine/soft/librealsense/include")
-link_directories("/usr/local/lib")
-set(LIBS ${LIBS} realsense2)
-
-link_directories( ${realsense_LIBRARY})
-include_directories( ${realsense_INCLUDE_DIR})
-
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS 1)
 # View the makefile commands during build

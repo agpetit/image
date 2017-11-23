@@ -122,7 +122,7 @@ endif()
 
 find_package(OpenGL)
 
-set(DEPENDENCIES realsense2 ${OPENGL_LIBRARIES})
+set(DEPENDENCIES realsense2 /usr/lib/x86_64-linux-gnu/librealsense2.so ${OPENGL_LIBRARIES})
 
         # Find glfw header
         find_path(GLFW_INCLUDE_DIR NAMES GLFW/glfw3.h
