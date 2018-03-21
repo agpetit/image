@@ -90,7 +90,7 @@ public:
     Data<ImageTypes> image;
     Data<TransformType> transform;
 
-    virtual std::string getTemplateName() const    override { return templateName(this);    }
+    virtual std::string getTemplateName() const    { return templateName(this);    }
     static std::string templateName(const MergeImages<ImageTypes>* = NULL) { return ImageTypes::Name(); }
 
     MergeImages()    :   Inherited()
@@ -127,7 +127,7 @@ public:
     virtual ~MergeImages()
     { }
 
-    virtual void init() override
+    virtual void init()
     {
         addInput(&nbImages);
         inputImages.resize(nbImages.getValue());
@@ -139,7 +139,7 @@ public:
         setDirtyValue();
     }
 
-    virtual void reinit() override
+    virtual void reinit()
     {
         inputImages.resize(nbImages.getValue());
         inputTransforms.resize(nbImages.getValue());
@@ -148,7 +148,7 @@ public:
 
 
     /// Parse the given description to assign values to this object's fields and potentially other parameters
-    void parse ( sofa::core::objectmodel::BaseObjectDescription* arg ) override
+    void parse ( sofa::core::objectmodel::BaseObjectDescription* arg )
     {
         inputImages.parseSizeData(arg, nbImages);
         inputTransforms.parseSizeData(arg, nbImages);
@@ -156,7 +156,7 @@ public:
     }
 
     /// Assign the field values stored in the given map of name -> value pairs
-    void parseFields ( const std::map<std::string,std::string*>& str ) override
+    void parseFields ( const std::map<std::string,std::string*>& str )
     {
         inputImages.parseFieldsSizeData(str, nbImages);
         inputTransforms.parseFieldsSizeData(str, nbImages);
@@ -172,7 +172,7 @@ protected:
         Coord u;
     };
 
-    virtual void update() override
+    virtual void update()
     {
         unsigned int nb = nbImages.getValue();
         inputImages.resize(nb);

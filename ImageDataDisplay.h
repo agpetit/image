@@ -66,7 +66,7 @@ public:
     Data< OutImageTypes > outputImage;
     Data<helper::SVector<helper::SVector<To> > > VoxelData;
 
-    virtual std::string getTemplateName() const    override { return templateName(this);    }
+    virtual std::string getTemplateName() const    { return templateName(this);    }
     static std::string templateName(const ImageDataDisplay<InImageTypes,OutImageTypes>* = NULL) { return InImageTypes::Name()+std::string(",")+OutImageTypes::Name(); }
 
     ImageDataDisplay()    :   Inherited()
@@ -80,7 +80,7 @@ public:
 
     virtual ~ImageDataDisplay() {}
 
-    virtual void init() override
+    virtual void init()
     {
         addInput(&VoxelData);
         addInput(&inputImage);
@@ -88,11 +88,11 @@ public:
         setDirtyValue();
     }
 
-    virtual void reinit() override { update(); }
+    virtual void reinit() { update(); }
 
 protected:
 
-    virtual void update() override
+    virtual void update()
     {
         const helper::SVector<helper::SVector<To> >& dat = this->VoxelData.getValue();
         raImagei in(this->inputImage);

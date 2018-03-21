@@ -52,7 +52,7 @@ public:
     
     }
     
-    virtual void init() override
+    virtual void init()
     {
         addOutput(&d_ip);
         addOutput(&d_p);
@@ -62,7 +62,7 @@ public:
         
     }
     
-    virtual sofa::gui::qt::LabelImageToolBoxAction* createTBAction(QWidget*parent=NULL) override
+    virtual sofa::gui::qt::LabelImageToolBoxAction* createTBAction(QWidget*parent=NULL)
     {
         sofa::gui::qt::LabelPointsBySectionImageToolBoxAction * t = new sofa::gui::qt::LabelPointsBySectionImageToolBoxAction(this,parent);
 

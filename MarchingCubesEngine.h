@@ -85,7 +85,7 @@ public:
     typedef helper::WriteOnlyAccessor<Data< SeqTriangles > > waTriangles;
     Data< SeqTriangles > triangles;
 
-    virtual std::string getTemplateName() const    override { return templateName(this);    }
+    virtual std::string getTemplateName() const    { return templateName(this);    }
     static std::string templateName(const MarchingCubesEngine<ImageTypes>* = NULL) { return ImageTypes::Name();    }
 
     MarchingCubesEngine()    :   Inherited()
@@ -104,7 +104,7 @@ public:
         f_listening.setValue(true);
     }
 
-    virtual void init() override
+    virtual void init()
     {
         addInput(&image);
         addInput(&transform);
@@ -113,13 +113,13 @@ public:
         setDirtyValue();
     }
 
-    virtual void reinit() override { update(); }
+    virtual void reinit() { update(); }
 
 protected:
 
     unsigned int time;
 
-    virtual void update() override
+    virtual void update()
     {
         raImage in(this->image);
 		raTransform inT(this->transform);
@@ -153,7 +153,7 @@ protected:
         cleanDirty();
     }
 
-    void handleEvent(sofa::core::objectmodel::Event *event) override
+    void handleEvent(sofa::core::objectmodel::Event *event)
     {
         if (simulation::AnimateEndEvent::checkEventType(event))
         {
@@ -172,7 +172,7 @@ protected:
         }
     }
 
-    virtual void draw(const core::visual::VisualParams* vparams) override
+    virtual void draw(const core::visual::VisualParams* vparams)
     {
 #ifndef SOFA_NO_OPENGL
         if (!vparams->displayFlags().getShowVisualModels()) return;

@@ -59,7 +59,7 @@ public:
     
     }
     
-    virtual void init() override
+    virtual void init()
     {/*
         d_ip.setGroup("PixelClicked");
         d_p.setGroup("PixelClicked");
@@ -70,7 +70,7 @@ public:
         addOutput(&d_vecPixCoord);*/
     }
     
-    virtual sofa::gui::qt::LabelImageToolBoxAction* createTBAction(QWidget*parent=NULL) override
+    virtual sofa::gui::qt::LabelImageToolBoxAction* createTBAction(QWidget*parent=NULL)
     {
         return new sofa::gui::qt::ZoneGeneratorImageToolBoxAction(this,parent);
     }
@@ -140,7 +140,7 @@ public:
     
     }
     
-    virtual void init() override
+    virtual void init()
     {
         Inherited::init();
         addInput(&d_image);
@@ -162,7 +162,7 @@ public:
         return (float)rand()/(float)RAND_MAX;
     }
 
-    virtual void generate() override
+    virtual void generate()
     {
 
         //std::cout << "generate"<<std::endl;

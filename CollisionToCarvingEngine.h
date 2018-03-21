@@ -95,7 +95,7 @@ public:
 	waImageo* out;
 	waTransform* outT;
 
-    virtual std::string getTemplateName() const    override { return templateName(this);    }
+    virtual std::string getTemplateName() const    { return templateName(this);    }
     static std::string templateName(const CollisionToCarvingEngine<InImageTypes,OutImageTypes>* = NULL) { return InImageTypes::Name()+std::string(",")+OutImageTypes::Name(); }
 
     CollisionToCarvingEngine()    :   Inherited()
@@ -123,7 +123,7 @@ public:
 		delete outT;
     }
 
-    virtual void init() override
+    virtual void init()
     {
 		//cout<<"init"<<endl;
 		addInput(&inputImage);
@@ -133,11 +133,11 @@ public:
 		setDirtyValue();
     }
 
-    virtual void reinit() override { update(); }
+    virtual void reinit() { update(); }
 
 protected:
 	
-    virtual void update() override
+    virtual void update()
     {
 		
 		bool updateImage = this->inputImage.isDirty();	// change of input image -> update output image
@@ -184,7 +184,7 @@ protected:
 		if (updateTransform) (*outT)->update(); // update internal data
     }
 
-    void handleEvent(sofa::core::objectmodel::Event *event) override
+    void handleEvent(sofa::core::objectmodel::Event *event)
     {
 		
         if ( simulation::AnimateBeginEvent::checkEventType(event) )
@@ -194,7 +194,7 @@ protected:
 		}
     }
 
-    virtual void draw(const core::visual::VisualParams* /*vparams*/) override
+    virtual void draw(const core::visual::VisualParams* /*vparams*/)
     {
 
     }

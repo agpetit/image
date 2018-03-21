@@ -513,7 +513,7 @@ public:
 
     /**@}*/
 
-    virtual std::string getTemplateName() const    override { return templateName(this);    }
+    virtual std::string getTemplateName() const    { return templateName(this);    }
     static std::string templateName(const ImageSampler<ImageTypes>* = NULL) { return ImageTypes::Name();    }
     ImageSampler()    :   Inherited()
         , image(initData(&image,ImageTypes(),"image",""))
@@ -549,7 +549,7 @@ public:
         ImageSamplerSpecialization<ImageTypes>::init( this );
     }
 
-    virtual void init() override
+    virtual void init()
     {
         addInput(&image);
         addInput(&transform);
@@ -563,13 +563,13 @@ public:
         setDirtyValue();
     }
 
-    virtual void reinit() override { update(); }
+    virtual void reinit() { update(); }
 
 protected:
 
     unsigned int time;
 
-    virtual void update() override
+    virtual void update()
     {
         updateAllInputsIfDirty(); // easy to ensure that all inputs are up-to-date
 
@@ -617,7 +617,7 @@ protected:
         }
     }
 
-    void handleEvent(sofa::core::objectmodel::Event *event) override
+    void handleEvent(sofa::core::objectmodel::Event *event)
     {
         if (simulation::AnimateEndEvent::checkEventType(event))
         {
@@ -637,7 +637,7 @@ protected:
     }
 
 #ifndef SOFA_NO_OPENGL
-    virtual void draw(const core::visual::VisualParams* vparams) override
+    virtual void draw(const core::visual::VisualParams* vparams)
     {
 #ifndef SOFA_NO_OPENGL
         if (!vparams->displayFlags().getShowVisualModels()) return;
@@ -654,7 +654,7 @@ protected:
             {
             case 1:
                 glPushAttrib(GL_LIGHTING_BIT);
-                vparams->drawTool()->enableLighting();
+                glEnable(GL_LIGHTING);
                 vparams->drawTool()->drawSpheres(this->position.getValue(),showSamplesScale.getValue(),defaulttype::Vec4f(0.1,0.7,0.1,1));
                 vparams->drawTool()->drawSpheres(this->fixedPosition.getValue(),showSamplesScale.getValue(),defaulttype::Vec4f(0.1,0.7,0.1,1));
                 glPopAttrib();

@@ -76,7 +76,7 @@ public:
     Data< ImageTypes > outputImage;
     Data< TransformType > outputTransform;
 
-    virtual std::string getTemplateName() const    override { return templateName(this);    }
+    virtual std::string getTemplateName() const    { return templateName(this);    }
     static std::string templateName(const ImageAccumulator<ImageTypes>* = NULL) { return ImageTypes::Name(); }
 
     ImageAccumulator()    :   Inherited()
@@ -97,7 +97,7 @@ public:
 
     virtual ~ImageAccumulator() {}
 
-    virtual void init() override
+    virtual void init()
     {
         addInput(&inputImage);
         addInput(&inputTransform);
@@ -106,14 +106,14 @@ public:
         setDirtyValue();
     }
 
-    virtual void reinit() override { update(); }
+    virtual void reinit() { update(); }
 
 protected:
     double SimuTime;
     ctime_t t0,t;
     int count;
 
-    virtual void update() override
+    virtual void update()
     {
         if(SimuTime==this->getContext()->getTime()) return; // check if simutime has changed
         SimuTime=this->getContext()->getTime();
@@ -135,7 +135,7 @@ protected:
         out->getCImgList().push_back(in->getCImg(0));
     }
 
-    void handleEvent(sofa::core::objectmodel::Event *event) override
+    void handleEvent(sofa::core::objectmodel::Event *event)
     {
         if ( /*simulation::AnimateEndEvent* ev =*/ simulation::AnimateEndEvent::checkEventType(event)) update();
     }

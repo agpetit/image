@@ -58,12 +58,12 @@ public:
 
     ~AverageCatchAllVector() {}
 
-    void init() override
+    void init()
     {
         reinit();
     }
 
-    void reinit() override
+    void reinit()
     {
         helper::vector<Type> data;
         const helper::vector<Type> &data1 = _data1.getValue();
@@ -85,7 +85,7 @@ public:
 
 protected:
 
-    virtual void update() override
+    virtual void update()
     {
     }
 

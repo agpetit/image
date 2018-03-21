@@ -65,7 +65,7 @@ public:
     Data<Real> scale; // scale
     Data<bool> inverse;
 
-    virtual std::string getTemplateName() const    override { return templateName(this);    }
+    virtual std::string getTemplateName() const    { return templateName(this);    }
     static std::string templateName(const ImageTransformEngine* = NULL) { return std::string();  }
 
     ImageTransformEngine()    :   Inherited()
@@ -80,7 +80,7 @@ public:
 
     virtual ~ImageTransformEngine() {}
 
-    virtual void init() override
+    virtual void init()
     {
         addInput(&translation);
         addInput(&rotation);
@@ -91,11 +91,11 @@ public:
         setDirtyValue();
     }
 
-    virtual void reinit() override { update(); }
+    virtual void reinit() { update(); }
 
 protected:
 
-    virtual void update() override
+    virtual void update()
     {
 		raTransform inT(this->inputTransform);
         waTransform outT(this->outputTransform);

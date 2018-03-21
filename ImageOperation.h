@@ -72,7 +72,7 @@ public:
 
     Data< ImageTypes > outputImage;
 
-    virtual std::string getTemplateName() const    override { return templateName(this);    }
+    virtual std::string getTemplateName() const    { return templateName(this);    }
     static std::string templateName(const ImageOperation<ImageTypes>* = NULL) { return ImageTypes::Name(); }
 
     ImageOperation()    :   Inherited()
@@ -97,7 +97,7 @@ public:
 
     virtual ~ImageOperation() {}
 
-    virtual void init() override
+    virtual void init()
     {
         addInput(&inputImage1);
         addInput(&inputImage2);
@@ -105,11 +105,11 @@ public:
         setDirtyValue();
     }
 
-    virtual void reinit() override { update(); }
+    virtual void reinit() { update(); }
 
 protected:
 
-    virtual void update() override
+    virtual void update()
     {
         raImage in1(this->inputImage1);
         raImage in2(this->inputImage2);

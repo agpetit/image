@@ -111,7 +111,7 @@ public:
     Data< OutImageTypes > outputImage;
     Data< TransformType > outputTransform;
 
-    virtual std::string getTemplateName() const    override { return templateName(this);    }
+    virtual std::string getTemplateName() const    { return templateName(this);    }
     static std::string templateName(const ImageFilter<InImageTypes,OutImageTypes>* = NULL) { return InImageTypes::Name()+std::string(",")+OutImageTypes::Name(); }
 
     ImageFilter()    :   Inherited()
@@ -163,7 +163,7 @@ public:
 
     virtual ~ImageFilter() {}
 
-    virtual void init() override
+    virtual void init()
 	{
         addInput(&inputImage);
         addInput(&inputTransform);
@@ -172,11 +172,11 @@ public:
         setDirtyValue();
     }
 
-    virtual void reinit() override { update(); }
+    virtual void reinit() { update(); }
 
 protected:
 
-    virtual void update() override
+    virtual void update()
     {
         bool updateImage = this->inputImage.isDirty();	// change of input image -> update output image
         bool updateTransform = this->inputTransform.isDirty();	// change of input transform -> update output transform

@@ -73,19 +73,19 @@ public:
 
     ~TestImageEngine() {}
 
-    void init() override
+    void init()
     {
         addInput(&inputImage);
         addOutput(&outputImage);
         setDirtyValue();
     }
 
-    void reinit() override
+    void reinit()
     {
         update();
     }
 
-    void update() override
+    void update()
     {
         waImage out(this->outputImage);
         raImage in(this->inputImage);
@@ -104,7 +104,7 @@ public:
         cleanDirty();
     }
 
-    void handleEvent(sofa::core::objectmodel::Event *event) override
+    void handleEvent(sofa::core::objectmodel::Event *event)
     {
         if (simulation::AnimateEndEvent::checkEventType(event))
         {

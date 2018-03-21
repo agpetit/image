@@ -90,7 +90,7 @@ public:
 
     Data< Real > minLength;
 
-    virtual std::string getTemplateName() const    override { return templateName(this);    }
+    virtual std::string getTemplateName() const    { return templateName(this);    }
     static std::string templateName(const VoronoiToMeshEngine<ImageTypes>* = NULL) { return ImageTypes::Name();    }
 
     VoronoiToMeshEngine()    :   Inherited()
@@ -109,7 +109,7 @@ public:
         f_listening.setValue(true);
     }
 
-    virtual void init() override
+    virtual void init()
     {
         addInput(&image);
         addInput(&background);
@@ -121,7 +121,7 @@ public:
         setDirtyValue();
     }
 
-    virtual void reinit() override { update(); }
+    virtual void reinit() { update(); }
 
 protected:
 
@@ -228,7 +228,7 @@ protected:
     }
 
 
-    virtual void update() override
+    virtual void update()
     {
         raImage in(this->image);
         raImage inb(this->background);
@@ -390,7 +390,7 @@ protected:
         cleanDirty();
     }
 
-    void handleEvent(sofa::core::objectmodel::Event *event) override
+    void handleEvent(sofa::core::objectmodel::Event *event)
     {
         if (simulation::AnimateEndEvent::checkEventType(event))
         {
@@ -409,7 +409,7 @@ protected:
         }
     }
 
-    virtual void draw(const core::visual::VisualParams* vparams) override
+    virtual void draw(const core::visual::VisualParams* vparams)
     {
 #ifndef SOFA_NO_OPENGL
 
