@@ -80,11 +80,6 @@ using namespace rs2;
 
 void* globalRealSenseCamClassPointer;
 
-
-//pthread_mutex_t backbuf_mutex = PTHREAD_MUTEX_INITIALIZER;
-//pthread_cond_t frame_cond = PTHREAD_COND_INITIALIZER;
-
-
 class RealSenseCam : public virtual core::objectmodel::BaseObject
 {
 public:
@@ -115,15 +110,9 @@ public:
     Data< DepthTypes > depthImage;
     Data< TransformType > depthTransform;
 
-    Data<unsigned int> deviceID;
     Data<helper::OptionsGroup> resolution;
-    Data<helper::OptionsGroup> videoMode;
     Data<helper::OptionsGroup> depthMode;
-    Data<helper::OptionsGroup> ledMode;
-    Data<int> tiltAngle;
-    Data<defaulttype::Vector3> accelerometer;
     Data<bool> drawBB;
-    Data<bool> drawGravity;
     Data<float> showArrowSize;
 	
 cv::Mat_<cv::Vec3f> points3d;
@@ -316,7 +305,9 @@ void handleEvent(sofa::core::objectmodel::Event *event)
     {
 if (dynamic_cast<simulation::AnimateEndEvent*>(event))
 {
-acquireAligned();
+        if(this->depthMode.getValue().getSelectedId()==0) acquireRaw();
+        else acquireAligned();
+
 }
 
 }
@@ -360,31 +351,6 @@ void getCorners(Vec<8,Vector3> &c) // get image corners
 
 void draw(const core::visual::VisualParams* vparams)
     {
-        // draw bounding box
-
-//std::cout << " depth cols " << depth.cols << std::endl;
-
-    /*for (int i = 0; i<depth.rows; i++)
-          for (int j = 0; j<depth.rows; j++)
-      std::cout << (int)depth.at<uchar>(i,j) << std::endl;*/
-
-
-/*cv::namedWindow("depth_softkinetic");
-    cv::imshow("depth_softkinetic",	depth);
-
-
-
-    // Allow OpenCV to shut down the program
-    char key = cvWaitKey(10);
-
-    if (key==27) {
-      printf("Quitting main loop from OpenCV\n");
-        context.quit();
-    }*/
-
-        //if (!vparams->displayFlags().getShowVisualModels()) return;
-        //if (!drawBB.getValue() && !drawGravity.getValue()) return;
-
         glPushAttrib( GL_LIGHTING_BIT | GL_ENABLE_BIT | GL_LINE_BIT );
         glPushMatrix();
 
@@ -407,15 +373,6 @@ void draw(const core::visual::VisualParams* vparams)
             glBegin(GL_LINE_LOOP);	glVertex3d(c[2][0],c[2][1],c[2][2]); glVertex3d(c[3][0],c[3][1],c[3][2]); glVertex3d(c[7][0],c[7][1],c[7][2]); glVertex3d(c[6][0],c[6][1],c[6][2]);	glEnd ();
         }
 
-        /*if(drawGravity.getValue())
-        {
-            const Vec<4,float> col(0,1,0,1);
-            raTransform rtransform(this->depthTransform);
-            Vector3 camCenter = rtransform->fromImage(Vector3(-0.5,-0.5,-0.5));
-            Vector3 acc = rtransform->qrotation.rotate(this->accelerometer.getValue());
-            vparams->drawTool()->drawArrow(camCenter, camCenter+acc*showArrowSize.getValue(), showArrowSize.getValue()*0.1, col);
-        }*/
-
         glPopMatrix ();
         glPopAttrib();
     }
@@ -433,15 +390,9 @@ RealSenseCam::RealSenseCam() : Inherited()
         , depthTransform(initData(&depthTransform, TransformType(), "depthTransform" , ""))
         , imageO(initData(&imageO,ImageTypes(),"image","image"))
         , transform(initData(&transform, TransformType(), "transform" , ""))
-        , deviceID ( initData ( &deviceID,(unsigned int)0,"deviceID","device ID" ) )
         , resolution ( initData ( &resolution,"resolution","resolution" ) )
-        , videoMode ( initData ( &videoMode,"videoMode","video mode" ) )
         , depthMode ( initData ( &depthMode,"depthMode","depth mode" ) )
-        , ledMode ( initData ( &ledMode,"ledMode","led mode" ) )
-        , tiltAngle(initData(&tiltAngle,0,"tiltAngle","tilt angle in [-30,30]"))
-        , accelerometer(initData(&accelerometer,Vector3(0,0,0),"accelerometer","Accelerometer data"))
         , drawBB(initData(&drawBB,false,"drawBB","draw bounding box"))
-        , drawGravity(initData(&drawGravity,true,"drawGravity","draw acceleration"))
         , showArrowSize(initData(&showArrowSize,0.1f,"showArrowSize","size of the axis"))
     {
 
@@ -452,7 +403,10 @@ RealSenseCam::RealSenseCam() : Inherited()
     depthTransform.setGroup("Transform");
     f_listening.setValue(true);  // to update camera during animate
     drawBB = false;
-    f_listening.setValue(true);  // to update camera during animate
+
+    helper::OptionsGroup opt(1 ,"Raw" ,"Aligned" );
+    opt.setSelectedItem(1);
+    depthMode.setValue(opt);
     }
 
 
