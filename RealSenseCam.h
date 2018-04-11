@@ -22,18 +22,9 @@
 *                                                                             *
 * Contact information: contact@sofa-framework.org                             *
 ******************************************************************************/
-#ifndef IMAGE_REALSENSECAM_H
-#define IMAGE_REALSENSECAM_H
+#ifndef SOFA_IMAGE_REALSENSECAM_H
+#define SOFA_IMAGE_REALSENSECAM_H
 
-#include <librealsense2/rs.hpp>
-#include <opencv2/opencv.hpp>
-#include <opencv2/highgui.hpp>
-#include <iostream>
-#include <string>
-#include <map>
-#include <opencv2/opencv.hpp>
-#include <boost/thread.hpp>
-#include <sys/times.h>
 
 #include <image/config.h>
 #include "ImageTypes.h"
@@ -49,6 +40,15 @@
 #include <sofa/defaulttype/Quat.h>
 #include <sofa/helper/rmath.h>
 #include <sofa/helper/OptionsGroup.h>
+
+#include <librealsense2/rs.hpp>
+#include <opencv2/opencv.hpp>
+#include <opencv2/highgui.hpp>
+#include <iostream>
+#include <string>
+#include <map>
+#include <boost/thread.hpp>
+#include <sys/times.h>
 
 #include <fstream>
 #include <algorithm>
@@ -237,11 +237,11 @@ void acquireAligned()
         frameset = pipe.wait_for_frames();
     }
 
-    auto proccessed = align.proccess(frameset);
+    auto processed = align.process(frameset);
 
    // Trying to get both color and aligned depth frames
-    rs2::video_frame color = proccessed.get_color_frame();
-    rs2::depth_frame depth = proccessed.get_depth_frame();
+    rs2::video_frame color = processed.get_color_frame();
+    rs2::depth_frame depth = processed.get_depth_frame();
 
     cv::Mat rgb,depth8u,depth16, depth32;
     int widthd, heightd, widthc, heightc;
@@ -486,11 +486,11 @@ void RealSenseCam::initAlign()
             frameset = pipe.wait_for_frames();
         }
 
-    auto proccessed = align.proccess(frameset);
+    auto processed = align.process(frameset);
 
     // Trying to get both color and aligned depth frames
-    rs2::video_frame color = proccessed.get_color_frame();
-    rs2::depth_frame depth = proccessed.get_depth_frame();
+    rs2::video_frame color = processed.get_color_frame();
+    rs2::depth_frame depth = processed.get_depth_frame();
 
     int widthd = depth.get_width();
     int heightd = depth.get_height();

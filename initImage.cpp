@@ -1,6 +1,6 @@
 /******************************************************************************
 *       SOFA, Simulation Open-Framework Architecture, development version     *
-*                (c) 2006-2017 INRIA, USTL, UJF, CNRS, MGH                    *
+*                (c) 2006-2018 INRIA, USTL, UJF, CNRS, MGH                    *
 *                                                                             *
 * This program is free software; you can redistribute it and/or modify it     *
 * under the terms of the GNU Lesser General Public License as published by    *
@@ -127,4 +127,7 @@ SOFA_LINK_CLASS(MeshToImageEngine)
 SOFA_LINK_CLASS(TransferFunction)
 #ifdef SOFA_HAVE_LIBFREENECT
 SOFA_LINK_CLASS(Kinect)
+#endif
+#ifdef SOFA_HAVE_realsense2
+SOFA_LINK_CLASS(RealSenseCam)
 #endif
