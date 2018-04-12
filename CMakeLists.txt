@@ -115,8 +115,6 @@ else()
     message(STATUS "image: could not find the realsense library, won't build the realsense component")
 endif()
 
-# todo?
-
 # if(SOFA-EXTERNAL_OPENCV)
 # AddLinkerDependencies("ml")
 # AddLinkerDependencies("cvaux")
@@ -131,7 +129,6 @@ if(SOFA_OPENMP)
     string(REPLACE "${OpenMP_CXX_FLAGS}" "" CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS})
     string(REPLACE "${OpenMP_CXX_FLAGS}" "" CMAKE_CXX_LINK_FLAGS ${CMAKE_CXX_LINK_FLAGS})
 endif()
-
 
 find_package(DiffusionSolver CONFIG REQUIRED)
 
@@ -193,7 +190,6 @@ endif()
 
 
 set_target_properties(${PROJECT_NAME} PROPERTIES COMPILE_FLAGS "${IMAGE_COMPILER_FLAGS}")
-
 
 find_package(SofaGui QUIET)
 if(SofaGui_FOUND AND SOFA_GUI_QT)
