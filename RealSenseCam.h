@@ -111,7 +111,7 @@ public:
     Data< TransformType > depthTransform;
 
     Data<helper::OptionsGroup> resolution;
-    Data<helper::OptionsGroup> depthMode;
+    Data<int> depthMode;
     Data<bool> drawBB;
     Data<float> showArrowSize;
 	
@@ -158,16 +158,20 @@ void acquireRaw()
      rs2::video_frame color = data.get_color_frame();
      rs2::depth_frame depth = data.get_depth_frame();
 
-     int widthd, heightd, widthc, heightc;
-
-     cv::Mat rgb0(heightc,widthc, CV_8UC3, (void*) color.get_data());
-     cv::Mat depth16,depth32;
-
     // Create depth image
     if (depth && color){
 
+     int widthd, heightd, widthc, heightc;
+
+     widthc = color.get_width();
+     heightc = color.get_height();
+
+     cv::Mat rgb0(heightc,widthc, CV_8UC3, (void*) color.get_data());
+
      widthd = depth.get_width();
      heightd = depth.get_height();
+
+     cv::Mat depth16,depth32;
 
      cv::Mat depth160( heightd, widthd, CV_16U, (void*)depth.get_data() );
      depth16=depth160.clone();
@@ -176,6 +180,9 @@ void acquireRaw()
 
      widthc = color.get_width();
      heightc = color.get_height();
+
+    //std::cout << " widthc " << widthc << " heigthc " << heightc << std::endl;
+    //std::cout << " widthd " << widthd << " heigthd " << heightd << std::endl;
 
      //depth8u = depth16;
      //depth8u.convertTo( depth8u, CV_8UC1, 255.0/1000);
@@ -197,7 +204,6 @@ void acquireRaw()
     CImg<dT>& depthimg =wdepth->getCImg(0);
     //depthimg.resize(widthd,heightd,1,1);
 
-
     cv::Mat bgr_image;
     cvtColor (rgb0, bgr_image, CV_RGB2BGR);
 
@@ -216,6 +222,8 @@ void acquireRaw()
 
     memcpy(depthimg.data(), (float*)depth32.data , w_depth*h_depth*sizeof(float));
 
+    std::cout << " ok acquire raw " << std::endl;
+
 }
 
 
@@ -227,7 +235,7 @@ void acquireAligned()
 
     rs2::frameset frameset;
 
-    std::cout << " ok acquire " << std::endl;
+    //double timeAcq0 = (double)getTickCount();
 
     while (!frameset.first_or_default(RS2_STREAM_DEPTH) || !frameset.first_or_default(RS2_STREAM_COLOR))
     {
@@ -236,11 +244,16 @@ void acquireAligned()
 
     auto processed = align.process(frameset);
 
+   //double timeAcq1 = (double)getTickCount();
+   //cout <<"time process frames " << (timeAcq1 - timeAcq0)/getTickFrequency() << endl;
    // Trying to get both color and aligned depth frames
     rs2::video_frame color = processed.get_color_frame();
     rs2::depth_frame depth = processed.get_depth_frame();
 
     int widthd, heightd, widthc, heightc;
+
+    widthc = color.get_width();
+    heightc = color.get_height();
 
     cv::Mat rgb0(heightc,widthc, CV_8UC3, (void*) color.get_data());
     cv::Mat depth16, depth32;
@@ -255,8 +268,6 @@ void acquireAligned()
 
     depth16.convertTo(depth32, CV_32F,(float)1/8190);
 
-    widthc = color.get_width();
-    heightc = color.get_height();
 
     // Read the color buffer and display
     int32_t w, h, w_depth, h_depth;
@@ -295,17 +306,17 @@ void acquireAligned()
 
     memcpy(depthimg.data(), (float*)depth32.data , w_depth*h_depth*sizeof(float));
 
+    std::cout << " ok acquire aligned " << std::endl;
+
 }
 
 
 void handleEvent(sofa::core::objectmodel::Event *event)
-    {
+{
 if (dynamic_cast<simulation::AnimateEndEvent*>(event))
 {
-       // if(this->depthMode.getValue().getSelectedId()==0) arcquireRaw();
-        //else 
-     acquireAligned();
-
+       if(this->depthMode.getValue()==0) acquireRaw();
+        else acquireAligned();
 }
 
 }
@@ -389,7 +400,7 @@ RealSenseCam::RealSenseCam() : Inherited()
         , imageO(initData(&imageO,ImageTypes(),"image","image"))
         , transform(initData(&transform, TransformType(), "transform" , ""))
         , resolution ( initData ( &resolution,"resolution","resolution" ) )
-        , depthMode ( initData ( &depthMode,"depthMode","depth mode" ) )
+        , depthMode ( initData ( &depthMode,1,"depthMode","depth mode" ) )
         , drawBB(initData(&drawBB,false,"drawBB","draw bounding box"))
         , showArrowSize(initData(&showArrowSize,0.1f,"showArrowSize","size of the axis"))
     {
@@ -401,10 +412,6 @@ RealSenseCam::RealSenseCam() : Inherited()
     depthTransform.setGroup("Transform");
     f_listening.setValue(true);  // to update camera during animate
     drawBB = false;
-
-    helper::OptionsGroup opt(1 ,"Raw" ,"Aligned" );
-    opt.setSelectedItem(1);
-    depthMode.setValue(opt);
     }
 
 
@@ -428,7 +435,7 @@ void RealSenseCam::initRaw()
 
     pipe.start();
     rs2::frameset data;
-    for (int i = 0; i < 20 ; i++)
+    for (int i = 0; i < 100 ; i++)
     data = pipe.wait_for_frames(); // Wait for next set of frames from the camera
     rs2::video_frame depth = data.get_depth_frame();
     rs2::video_frame color = data.get_color_frame();
@@ -445,6 +452,9 @@ void RealSenseCam::initRaw()
 
     int widthc = color.get_width();
     int heightc = color.get_height();
+
+    std::cout << " widthc " << widthc << " heigthc " << heightc << std::endl;
+    std::cout << " widthd " << widthd << " heigthd " << heightd << std::endl;
 
     waDepth wdepth(this->depthImage);
     waTransform wdt(this->depthTransform);
@@ -464,7 +474,43 @@ void RealSenseCam::initRaw()
     wit->setCamPos((Real)(wimage->getDimensions()[0]-1)/2.0,(Real)(wimage->getDimensions()[1]-1)/2.0); // for perspective transforms
     wit->update(); // update of internal data
 
-    std::cout << " ok init " << std::endl;
+    cv::Mat rgb,depth8u,depth16, depth32;
+
+
+    // Create depth image
+
+    cv::Mat depth160( heightd, widthd, CV_16U, (void*)depth.get_data() );
+    depth16=depth160.clone();
+    depth16.convertTo(depth32, CV_32F, (float)1/8190);
+    cv::Mat rgb0(heightc,widthc, CV_8UC3, (void*) color.get_data());
+
+    // Read the color buffer and display
+    int32_t w, h, w_depth, h_depth;
+
+    w = widthc;
+    h = heightc;
+    w_depth = widthd;
+    h_depth = heightd;
+
+    cv::Mat bgr_image;
+    cvtColor (rgb0, bgr_image, CV_RGB2BGR);
+
+    //depth16.convertTo( depth8u, CV_8UC1, 255.0/1000 );
+    //cv::imwrite("bgr.png", depth8u);
+
+            if(img.spectrum()==3)
+            {
+            unsigned char* rgb0 = (unsigned char*)bgr_image.data;
+            //unsigned char* rgb = (unsigned char*)color.get_data();
+            unsigned char *ptr_r = img.data(0,0,0,2), *ptr_g = img.data(0,0,0,1), *ptr_b = img.data(0,0,0,0);
+            for ( int siz = 0 ; siz<img.width()*img.height(); siz++)    { *(ptr_r++) = *(rgb0++); *(ptr_g++) = *(rgb0++); *(ptr_b++) = *(rgb0++);
+                        }
+            }
+            else memcpy(img.data(),  bgr_image.data, img.width()*img.height()*sizeof(T));
+
+    memcpy(depthimg.data(), (float*)depth32.data , w_depth*h_depth*sizeof(float));
+
+    std::cout << " ok init raw " << std::endl;
 
 }
 
@@ -473,8 +519,6 @@ void RealSenseCam::initAlign()
     pipe.start();
     rs2::align align(RS2_STREAM_COLOR);
     rs2::frameset frameset;
-
-    std::cout << " ok acquire " << std::endl;
 
         for (int it= 0; it < 100 ; it++)
         frameset = pipe.wait_for_frames();
@@ -551,7 +595,7 @@ void RealSenseCam::initAlign()
 
     memcpy(depthimg.data(), (float*)depth32.data , w_depth*h_depth*sizeof(float));
 
-    std::cout << " ok init " << std::endl;
+    std::cout << " ok init align " << std::endl;
 
 
 }
@@ -559,7 +603,8 @@ void RealSenseCam::initAlign()
 void RealSenseCam::init()
 {
 
-    initAlign();
+   if(this->depthMode.getValue()==0) initRaw();
+   else initAlign();
 
 }
 
