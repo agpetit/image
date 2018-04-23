@@ -158,9 +158,10 @@ void acquireRaw()
      rs2::video_frame color = data.get_color_frame();
      rs2::depth_frame depth = data.get_depth_frame();
 
-    cv::Mat rgb,depth8u,depth16;
+     int widthd, heightd, widthc, heightc;
 
-    int widthd, heightd, widthc, heightc;
+     cv::Mat rgb0(heightc,widthc, CV_8UC3, (void*) color.get_data());
+     cv::Mat depth16,depth32;
 
     // Create depth image
     if (depth && color){
@@ -169,19 +170,15 @@ void acquireRaw()
      heightd = depth.get_height();
 
      cv::Mat depth160( heightd, widthd, CV_16U, (void*)depth.get_data() );
+     depth16=depth160.clone();
 
-     depth16=depth160;
+     depth16.convertTo(depth32, CV_32F,(float)1/8190);
 
      widthc = color.get_width();
      heightc = color.get_height();
 
-     cv::Mat rgb0(heightc,widthc, CV_8UC3, (void*) color.get_data());
-
-     rgb=rgb0;
-
-     depth8u = depth16;
-     depth8u.convertTo( depth8u, CV_8UC1, 255.0/1000);
-
+     //depth8u = depth16;
+     //depth8u.convertTo( depth8u, CV_8UC1, 255.0/1000);
 
 
     // Read the color buffer and display
@@ -202,7 +199,7 @@ void acquireRaw()
 
 
     cv::Mat bgr_image;
-    cvtColor (rgb, bgr_image, CV_RGB2BGR);
+    cvtColor (rgb0, bgr_image, CV_RGB2BGR);
 
             if(img.spectrum()==3)
             {
@@ -217,7 +214,7 @@ void acquireRaw()
     waImage wimage1(this->imageO);
     CImg<T>& img1 =wimage1->getCImg(0);
 
-    memcpy(depthimg.data(), (float*)depth16.data , w_depth*h_depth*sizeof(float));
+    memcpy(depthimg.data(), (float*)depth32.data , w_depth*h_depth*sizeof(float));
 
 }
 
@@ -243,8 +240,10 @@ void acquireAligned()
     rs2::video_frame color = processed.get_color_frame();
     rs2::depth_frame depth = processed.get_depth_frame();
 
-    cv::Mat rgb,depth8u,depth16, depth32;
     int widthd, heightd, widthc, heightc;
+
+    cv::Mat rgb0(heightc,widthc, CV_8UC3, (void*) color.get_data());
+    cv::Mat depth16, depth32;
 
     // Create depth image
 
@@ -258,8 +257,6 @@ void acquireAligned()
 
     widthc = color.get_width();
     heightc = color.get_height();
-
-    cv::Mat rgb0(heightc,widthc, CV_8UC3, (void*) color.get_data());
 
     // Read the color buffer and display
     int32_t w, h, w_depth, h_depth;
@@ -305,8 +302,9 @@ void handleEvent(sofa::core::objectmodel::Event *event)
     {
 if (dynamic_cast<simulation::AnimateEndEvent*>(event))
 {
-        if(this->depthMode.getValue().getSelectedId()==0) acquireRaw();
-        else acquireAligned();
+       // if(this->depthMode.getValue().getSelectedId()==0) arcquireRaw();
+        //else 
+     acquireAligned();
 
 }
 
