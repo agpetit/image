@@ -43,7 +43,7 @@
 
 #include <librealsense2/rs.hpp>
 #include <opencv2/opencv.hpp>
-#include <opencv2/highgui.hpp>
+#include <opencv2/imgproc.hpp>
 #include <iostream>
 #include <string>
 #include <map>
@@ -53,6 +53,9 @@
 #include <fstream>
 #include <algorithm>
 #include <cstring>
+
+#include <chrono>
+#include <thread>
 
 #ifdef Success
   #undef Success
@@ -226,7 +229,6 @@ void acquireRaw()
 
 }
 
-
 }
 
 void acquireAligned()
@@ -250,25 +252,27 @@ void acquireAligned()
     rs2::video_frame color = processed.get_color_frame();
     rs2::depth_frame depth = processed.get_depth_frame();
 
+    if (depth && color)
+    {
+    double timePCD = (double)getTickCount();
+
+
     int widthd, heightd, widthc, heightc;
 
     widthc = color.get_width();
     heightc = color.get_height();
 
     cv::Mat rgb0(heightc,widthc, CV_8UC3, (void*) color.get_data());
-    cv::Mat depth16, depth32;
+    cv::Mat depth16, depth32,depth8u;
+    //cv::imwrite("rgb12.png", rgb0);
 
     // Create depth image
-
     widthd = depth.get_width();
     heightd = depth.get_height();
 
     cv::Mat depth160( heightd, widthd, CV_16U, (void*)depth.get_data() );
-    depth16=depth160.clone();
 
-    depth16.convertTo(depth32, CV_32F,(float)1/8190);
-
-
+    depth160.convertTo(depth32, CV_32F,(float)1/8190);
     // Read the color buffer and display
     int32_t w, h, w_depth, h_depth;
 
@@ -286,30 +290,31 @@ void acquireAligned()
     CImg<dT>& depthimg =wdepth->getCImg(0);
     depthimg.resize(widthd,heightd,1,1);
 
-
     //cv::Mat bgr_image;
     //cvtColor (rgb0, bgr_image, CV_RGB2BGR);
 
-    //depth16.convertTo( depth8u, CV_8UC1, 255.0/1000 );
-    //cv::imwrite("bgr0.png", depth8u);
+    /*depth160.convertTo( depth8u, CV_8UC1, 255.0/1000 );
+    cv::imwrite("bgr0.png", depth8u);*/
 
-            if(img.spectrum()==3)
-            {
-            //unsigned char* rgb0 = (unsigned char*)bgr_image.data;
-            //unsigned char* rgb = (unsigned char*)color.get_data();
-            unsigned char* rgb1 = (unsigned char*)rgb0.data;
-            unsigned char *ptr_b = img.data(0,0,0,2), *ptr_g = img.data(0,0,0,1), *ptr_r = img.data(0,0,0,0);
-            for ( int siz = 0 ; siz<img.width()*img.height(); siz++)    { *(ptr_r++) = *(rgb1++); *(ptr_g++) = *(rgb1++); *(ptr_b++) = *(rgb1++);
-                        }
-            }
-            else memcpy(img.data(),  rgb0.data, img.width()*img.height()*sizeof(T));
+        if(img.spectrum()==3)
+        {
+        //unsigned char* rgb0 = (unsigned char*)bgr_image.data;
+        //unsigned char* rgb = (unsigned char*)color.get_data();
+        unsigned char* rgb1 = (unsigned char*)rgb0.data;
+        unsigned char *ptr_b = img.data(0,0,0,2), *ptr_g = img.data(0,0,0,1), *ptr_r = img.data(0,0,0,0);
+        for ( int siz = 0 ; siz<img.width()*img.height(); siz++)    { *(ptr_r++) = *(rgb1++); *(ptr_g++) = *(rgb1++); *(ptr_b++) = *(rgb1++);
+                    }
+        }
+        else memcpy(img.data(),  rgb0.data, img.width()*img.height()*sizeof(T));
 
+    //memcpy(depthimg.data(), (ushort*)depth160.data , w_depth*h_depth*sizeof(ushort));
     memcpy(depthimg.data(), (float*)depth32.data , w_depth*h_depth*sizeof(float));
-
-    std::cout << " ok acquire aligned " << std::endl;
+    timePCD = ((double)getTickCount() - timePCD)/getTickFrequency();
+    //boost::this_thread::sleep( boost::posix_time::milliseconds(10) );
+    std::cout << " TIME ACQUIRE " << timePCD << std::endl;
+    }
 
 }
-
 
 void handleEvent(sofa::core::objectmodel::Event *event)
 {
@@ -385,12 +390,6 @@ void draw(const core::visual::VisualParams* vparams)
         glPopMatrix ();
         glPopAttrib();
     }
-
-
-
-
-
-
 };
 
 
@@ -453,8 +452,8 @@ void RealSenseCam::initRaw()
     int widthc = color.get_width();
     int heightc = color.get_height();
 
-    std::cout << " widthc " << widthc << " heigthc " << heightc << std::endl;
-    std::cout << " widthd " << widthd << " heigthd " << heightd << std::endl;
+    //std::cout << " widthc " << widthc << " heigthc " << heightc << std::endl;
+    //std::cout << " widthd " << widthd << " heigthd " << heightd << std::endl;
 
     waDepth wdepth(this->depthImage);
     waTransform wdt(this->depthTransform);
@@ -557,10 +556,7 @@ void RealSenseCam::initAlign()
 
     wit->setCamPos((Real)(wimage->getDimensions()[0]-1)/2.0,(Real)(wimage->getDimensions()[1]-1)/2.0); // for perspective transforms
     wit->update(); // update of internal data
-
-
     cv::Mat rgb,depth8u,depth16, depth32;
-
 
     // Create depth image
 

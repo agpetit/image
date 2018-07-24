@@ -105,7 +105,7 @@ else()
 endif()
 
 
-find_package(OpenCV REQUIRED)
+find_package(OpenCV)
 find_package(realsense2)
 if(realsense2_FOUND)
     list(APPEND HEADER_FILES RealSenseCam.h)
