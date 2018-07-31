@@ -365,7 +365,7 @@ void getCorners(Vec<8,Vector3> &c) // get image corners
 
 void draw(const core::visual::VisualParams* vparams)
     {
-        glPushAttrib( GL_LIGHTING_BIT | GL_ENABLE_BIT | GL_LINE_BIT );
+        /*glPushAttrib( GL_LIGHTING_BIT | GL_ENABLE_BIT | GL_LINE_BIT );
         glPushMatrix();
 
         if (drawBB.getValue())
@@ -388,7 +388,7 @@ void draw(const core::visual::VisualParams* vparams)
         }
 
         glPopMatrix ();
-        glPopAttrib();
+        glPopAttrib();*/
     }
 };
 
