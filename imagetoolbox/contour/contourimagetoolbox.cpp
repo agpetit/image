@@ -1,9 +1,10 @@
 #define CONTOURIMAGETOOLBOX_CPP
 
+#include "contourimagetoolbox.h"
+
 #include <sofa/core/ObjectFactory.h>
 
-#include "contourimagetoolbox.h"
-#include "ImageTypes.h"
+#include <image/ImageTypes.h>
 
 
 namespace sofa

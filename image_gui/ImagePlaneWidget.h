@@ -1,23 +1,20 @@
 /******************************************************************************
-*       SOFA, Simulation Open-Framework Architecture, version 1.0 beta 4      *
-*                (c) 2006-2009 MGH, INRIA, USTL, UJF, CNRS                    *
+*       SOFA, Simulation Open-Framework Architecture, development version     *
+*                (c) 2006-2018 INRIA, USTL, UJF, CNRS, MGH                    *
 *                                                                             *
-* This library is free software; you can redistribute it and/or modify it     *
+* This program is free software; you can redistribute it and/or modify it     *
 * under the terms of the GNU Lesser General Public License as published by    *
 * the Free Software Foundation; either version 2.1 of the License, or (at     *
 * your option) any later version.                                             *
 *                                                                             *
-* This library is distributed in the hope that it will be useful, but WITHOUT *
+* This program is distributed in the hope that it will be useful, but WITHOUT *
 * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or       *
 * FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License *
 * for more details.                                                           *
 *                                                                             *
 * You should have received a copy of the GNU Lesser General Public License    *
-* along with this library; if not, write to the Free Software Foundation,     *
-* Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA.          *
+* along with this program. If not, see <http://www.gnu.org/licenses/>.        *
 *******************************************************************************
-*                               SOFA :: Modules                               *
-*                                                                             *
 * Authors: The SOFA Team and external contributors (see Authors.txt)          *
 *                                                                             *
 * Contact information: contact@sofa-framework.org                             *
@@ -25,11 +22,13 @@
 #ifndef SOFA_IMAGE_IMAGEPLANEWIDGET_H
 #define SOFA_IMAGE_IMAGEPLANEWIDGET_H
 
-#include "initImage_gui.h"
+#include <image/image_gui/config.h>
 #include <sofa/gui/qt/DataWidget.h>
 #include <sofa/gui/qt/SimpleDataWidget.h>
 
-#ifdef SOFA_QT4
+#include "../ImageTypes.h"
+#include "../ImageViewer.h"
+
 #include <QLabel>
 #include <QVBoxLayout>
 #include <QGridLayout>
@@ -39,28 +38,14 @@
 #include <QDoubleSpinBox>
 #include <QGraphicsView>
 #include <QGraphicsScene>
-#include <QtGui>
-#else
-#include <qlabel.h>
-#include <qvboxlayout.h>
-#include <qgridlayout.h>
-#include <qimage.h>
-#include <qlayout.h>
-#include <qslider.h>
-#include <qstring.h>
-#include <qdoublespinbox.h>
-#include <qgraphicsView.h>
-#include <qgraphicsscene.h>
-#include <qtgui.h>
-#endif
+#include <QScrollBar>
 
-#include "../ImageTypes.h"
-#include "../ImageViewer.h"
 #include <sofa/core/objectmodel/BaseData.h>
 #include <sofa/core/objectmodel/Data.h>
 #include <sofa/helper/rmath.h>
 #include <sofa/helper/vector.h>
 
+#undef Bool
 
 #if !defined(INFINITY)
 #define INFINITY 9.0e10
@@ -73,8 +58,6 @@ namespace gui
 {
 namespace qt
 {
-
-using cimg_library::CImg;
 
 //-----------------------------------------------------------------------------------------------//
 //	image widget -> draw image and handle mouse events
@@ -305,7 +288,7 @@ public:
         this->indexmax=this->imageplane->getDimensions()[this->axis]-1;
         this->index=this->backupindex=this->imageplane->getPlane()[this->axis];
 
-        CImg<T> temp = this->imageplane->get_slice(0,this->axis);
+        cimg_library::CImg<T> temp = this->imageplane->get_slice(0,this->axis);
         this->image=QImage(temp.width(),temp.height(),QImage::Format_RGB32);
         draw();
     }
@@ -337,7 +320,7 @@ public:
         else P=Coord((pt.x()),(pt.y()),this->index);
 
         Coord p=this->imageplane->get_pointCoord(P);
-        CImg<T> val=this->imageplane->get_point(P);
+        cimg_library::CImg<T> val=this->imageplane->get_point(P);
 
         QString tval;
         if(!val) tval=QString("-");
@@ -379,7 +362,7 @@ public:
     {
         if(!this->imageplane) return;
 
-        CImg<unsigned char> plane = convertToUC( this->imageplane->get_slice(this->index, this->axis).cut(imageplane->getClamp()[0],imageplane->getClamp()[1]) );
+        cimg_library::CImg<unsigned char> plane = convertToUC( this->imageplane->get_slice(this->index, this->axis).cut(imageplane->getClamp()[0],imageplane->getClamp()[1]) );
 
         if(plane)
         {
@@ -388,7 +371,7 @@ public:
             else  { for( int y=0; y<this->image.height(); y++) for( int x=0; x<this->image.width(); x++) this->image.setPixel ( x, y,  qRgb(plane(x,y,0,0),plane(x,y,0,1),plane(x,y,0,2))); }
         }
 
-        CImg<unsigned char> slicedModels; 	if(this->visumodels) slicedModels = this->imageplane->get_slicedModels(this->index,this->axis);
+        cimg_library::CImg<unsigned char> slicedModels; 	if(this->visumodels) slicedModels = this->imageplane->get_slicedModels(this->index,this->axis);
 
         if(slicedModels)
             for( int y=0; y<this->image.height(); y++)
@@ -457,9 +440,9 @@ public:
         QHBoxLayout *layout = new QHBoxLayout(this);
         layout->setMargin(0);
         layout->setSpacing(10);
-        layout->add(toggle);
-        layout->add(slider);
-        layout->add(label);
+        layout->addWidget(toggle);
+        layout->addWidget(slider);
+        layout->addWidget(label);
 
         this->setFixedHeight ( height );
     }
@@ -514,9 +497,9 @@ public:
         label3=new QLabel(this);
 
         QVBoxLayout *layout = new QVBoxLayout(this);
-        layout->add(label1);
-        layout->add(label2);
-        layout->add(label3);
+        layout->addWidget(label1);
+        layout->addWidget(label2);
+        layout->addWidget(label3);
     }
 
 public slots:
@@ -551,7 +534,7 @@ public:
         indexPoint = 1;
 
         QHBoxLayout *layout = new QHBoxLayout(this);
-        layout->add(textEdit);
+        layout->addWidget(textEdit);
     }
 
 public slots:
@@ -632,7 +615,8 @@ public:
     bool createLayout( QLayout* layout)
     {
         if ( container_layout != NULL ) return false;
-        container_layout = new Layout(layout);
+        container_layout = new Layout();
+        layout->addItem(container_layout);
         return true;
     }
 
@@ -736,8 +720,8 @@ public:
         assert(container_layout);
 
         QGridLayout* layout = new QGridLayout();
-        layout->setColStretch(0, 50);
-        layout->setColStretch(1, 50);
+        layout->setColumnStretch(0, 50);
+        layout->setColumnStretch(1, 50);
 
         layout->setRowStretch(0,50);
         layout->setRowStretch(2,50);
@@ -755,11 +739,11 @@ public:
         layout->addWidget(togglePointList,3,1);
 
         container_layout->addLayout(layout);
-        container_layout->add(togglemodels);
+        container_layout->addWidget(togglemodels);
 
         //if(graphXY && graphXZ && graphZY) layout->addWidget(info,2,1);
         //else
-        container_layout->add(info);
+        container_layout->addWidget(info);
 
     }
 

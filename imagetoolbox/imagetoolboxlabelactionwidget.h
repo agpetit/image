@@ -1,10 +1,15 @@
 #ifndef IMAGETOOLBOXLABELACTIONWIDGET_H
 #define IMAGETOOLBOXLABELACTIONWIDGET_H
 
-#include <QtGui>
+#include <image/image_gui/config.h>
+
+#include <QVBoxLayout>
+#include <QComboBox>
+#include <QPushButton>
+#include <QStackedWidget>
+
 #include "imagetoolboxcentralwidget.h"
 #include "labelimagetoolboxaction.h"
-#include "initImage_gui.h"
 
 namespace sofa
 {
@@ -23,8 +28,8 @@ Q_OBJECT
     QStackedWidget *stack;
     
     unsigned int currentAxis;
-    Vec3f currentImagePosition;
-    Vec3f current3DPosition;
+    defaulttype::Vec3f currentImagePosition;
+    defaulttype::Vec3f current3DPosition;
     QString currentVal;
     
     typedef sofa::component::engine::LabelImageToolBox Label;
@@ -33,7 +38,7 @@ Q_OBJECT
     typedef helper::vector<LabelAction*> VecLabelAction;
     
     VecLabelAction vecLabelAction;
-    int currentLabel;
+//    int currentLabel;
     
     QGraphicsScene *GraphXY;
     QGraphicsScene *GraphXZ;
@@ -41,7 +46,7 @@ Q_OBJECT
 
 public:
     ImageToolBoxLabelActionWidget():QWidget(),
-        currentLabel(0),GraphXY(NULL),GraphXZ(NULL),GraphZY(NULL)
+        /*currentLabel(0),*/GraphXY(NULL),GraphXZ(NULL),GraphZY(NULL)
     {
         this->setToolTip("LabelAction");
 

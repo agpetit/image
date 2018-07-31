@@ -1,16 +1,17 @@
 #ifndef LABELPOINTIMAGETOOLBOX_H
 #define LABELPOINTIMAGETOOLBOX_H
 
-#include <sofa/component/component.h>
 #include <sofa/core/DataEngine.h>
 #include <sofa/core/objectmodel/BaseObject.h>
 
+#include <QDataStream>
 #include "labelpointimagetoolboxaction.h"
 #include "../labelimagetoolbox.h"
 
 
 
-#include "initImage_gui.h"
+
+#include <image/image_gui/config.h>
 
 
 
@@ -38,7 +39,7 @@ public:
     
     }
     
-    virtual void init()
+    virtual void init() override
     {
         addOutput(&d_ip);
         addOutput(&d_p);
@@ -47,7 +48,7 @@ public:
         
     }
     
-    virtual sofa::gui::qt::LabelImageToolBoxAction* createTBAction(QWidget*parent=NULL)
+    virtual sofa::gui::qt::LabelImageToolBoxAction* createTBAction(QWidget*parent=NULL) override
     {
         return new sofa::gui::qt::LabelPointImageToolBoxAction(this,parent);
     }

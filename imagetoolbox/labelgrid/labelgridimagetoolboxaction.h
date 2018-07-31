@@ -1,13 +1,14 @@
 #ifndef LABELGRIDIMAGETOOLBOXACTION_H
 #define LABELGRIDIMAGETOOLBOXACTION_H
 
-#include <QtGui>
+#include <image/image_gui/config.h>
+
+#include <QSpinBox>
+#include <QPushButton>
 
 
 #include "../labelimagetoolboxaction.h"
 //#include "labelpointimagetoolbox.h"
-
-#include "initImage_gui.h"
 
 namespace sofa
 {

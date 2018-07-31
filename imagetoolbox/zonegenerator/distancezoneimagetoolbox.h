@@ -4,15 +4,14 @@
 #include "distancezoneimagetoolboxaction.h"
 #include "zonegeneratorimagetoolbox.h"
 
-#include <sofa/component/component.h>
 #include <sofa/core/DataEngine.h>
 #include <sofa/core/objectmodel/BaseObject.h>
 #include <sofa/defaulttype/VecTypes.h>
-#include "ImageTypes.h"
+#include <image/ImageTypes.h>
 
 #include "../labelimagetoolbox.h"
 
-#include "initImage_gui.h"
+#include <image/image_gui/config.h>
 
 namespace sofa
 {
@@ -61,7 +60,7 @@ public:
     
     }
     
-    virtual void init()
+    virtual void init() override
     {/*
         d_ip.setGroup("PixelClicked");
         d_p.setGroup("PixelClicked");
@@ -72,7 +71,7 @@ public:
         addOutput(&d_vecPixCoord);*/
     }
     
-    virtual sofa::gui::qt::LabelImageToolBoxAction* createTBAction(QWidget*parent=NULL)
+    virtual sofa::gui::qt::LabelImageToolBoxAction* createTBAction(QWidget*parent=NULL) override
     {
         return new sofa::gui::qt::DistanceZoneImageToolBoxAction(this,parent);
     }
@@ -87,8 +86,8 @@ public:
     Data<Vec3d> d_p;
     Data<unsigned int> d_axis;
     Data<std::string> d_value;
-    Data<VecCoord> d_vecCoord;
-    Data<VecPixCoord> d_vecPixCoord;
+    Data<VecCoord> d_vecCoord; ///< Output list of space position of each pixel on contour
+    Data<VecPixCoord> d_vecPixCoord; ///< Output list of image position of each pixel on contour
 
     Data<double> threshold;
     Data<int> radius;
@@ -122,7 +121,7 @@ public:
     
     }
     
-    virtual void init()
+    virtual void init() override
     {
         Inherited::init();
         addInput(&d_image);
@@ -136,7 +135,7 @@ public:
     }
 
 
-    virtual void generate()
+    virtual void generate() override
     {
         raImage im_in(this->d_image);
         waImage im_out(this->d_imageOut);
@@ -146,22 +145,22 @@ public:
 
         const unsigned int dimX = im_in->getCImg().width();
         const unsigned int dimY = im_in->getCImg().height();
-        const unsigned int dimZ = im_in->getCImg().depth();
+//        const unsigned int dimZ = im_in->getCImg().depth();
         const unsigned int dimS = im_in->getCImg().spectrum();
 
-        const unsigned int nbPixels = dimX*dimY;
+//        const unsigned int nbPixels = dimX*dimY;
 
-        unsigned int max = 1 + (unsigned int)(sqrt((double)(dimX*dimX+dimY*dimY)));
+//        unsigned int max = 1 + (unsigned int)(sqrt((double)(dimX*dimX+dimY*dimY)));
 
         double maxdistance=0;
         // calculate max distance
-        for(int i=0;i<dimX;i++)
-        for(int j=0;j<dimY;j++)
+        for(int i=0;i<(int)dimX;i++)
+        for(int j=0;j<(int)dimY;j++)
         {
             unsigned int currentColor = im_in->getCImg()(i,j,0,0,0);
 
-            for(int ii=0;ii<dimX;ii++)
-            for(int jj=0;jj<dimY;jj++)
+            for(int ii=0;ii<(int)dimX;ii++)
+            for(int jj=0;jj<(int)dimY;jj++)
             {
                 unsigned int color2 = im_in->getCImg()(ii,jj,0,0,0);
                 int x = i-ii, y= j-jj;
@@ -177,8 +176,8 @@ public:
 
 
         // set color
-        for(int i=0;i<dimX;i++)
-        for(int j=0;j<dimY;j++)
+        for(int i=0;i<(int)dimX;i++)
+        for(int j=0;j<(int)dimY;j++)
         {
             unsigned int currentColor = im_in->getCImg()(i,j,0,0,0);
 
@@ -188,8 +187,8 @@ public:
 
 
 
-            for(int ii=0;ii<dimX;ii++)
-            for(int jj=0;jj<dimY;jj++)
+            for(int ii=0;ii<(int)dimX;ii++)
+            for(int jj=0;jj<(int)dimY;jj++)
             {
                 unsigned int color2 = im_in->getCImg()(ii,jj,0,0,0);
                 int x = i-ii, y= j-jj;
@@ -238,9 +237,9 @@ public:
 
 
 protected:
-    Data< ImageTypes >   d_image;
+    Data< ImageTypes >   d_image; ///< Input image
 //    Data< TransformType> d_transform;
-    Data< ImageTypes >   d_imageOut;
+    Data< ImageTypes >   d_imageOut; ///< OutputImage
 
 //    Data<T> color;
 //    vector<pixCoord> processList;

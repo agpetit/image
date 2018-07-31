@@ -1,23 +1,20 @@
 /******************************************************************************
-*       SOFA, Simulation Open-Framework Architecture, version 1.0 beta 4      *
-*                (c) 2006-2009 MGH, INRIA, USTL, UJF, CNRS                    *
+*       SOFA, Simulation Open-Framework Architecture, development version     *
+*                (c) 2006-2018 INRIA, USTL, UJF, CNRS, MGH                    *
 *                                                                             *
-* This library is free software; you can redistribute it and/or modify it     *
+* This program is free software; you can redistribute it and/or modify it     *
 * under the terms of the GNU Lesser General Public License as published by    *
 * the Free Software Foundation; either version 2.1 of the License, or (at     *
 * your option) any later version.                                             *
 *                                                                             *
-* This library is distributed in the hope that it will be useful, but WITHOUT *
+* This program is distributed in the hope that it will be useful, but WITHOUT *
 * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or       *
 * FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License *
 * for more details.                                                           *
 *                                                                             *
 * You should have received a copy of the GNU Lesser General Public License    *
-* along with this library; if not, write to the Free Software Foundation,     *
-* Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA.          *
+* along with this program. If not, see <http://www.gnu.org/licenses/>.        *
 *******************************************************************************
-*                               SOFA :: Modules                               *
-*                                                                             *
 * Authors: The SOFA Team and external contributors (see Authors.txt)          *
 *                                                                             *
 * Contact information: contact@sofa-framework.org                             *
@@ -25,16 +22,15 @@
 #ifndef SOFA_IMAGE_DEPTHMAPTOMESHENGINE_H
 #define SOFA_IMAGE_DEPTHMAPTOMESHENGINE_H
 
-#include "initImage.h"
+#include <image/config.h>
 #include "ImageTypes.h"
 #include <sofa/core/DataEngine.h>
-#include <sofa/component/component.h>
 #include <sofa/core/objectmodel/BaseObject.h>
 #include <sofa/core/topology/BaseMeshTopology.h>
 #include <sofa/core/visual/VisualParams.h>
 
 #include <sofa/core/objectmodel/Event.h>
-#include <sofa/simulation/common/AnimateEndEvent.h>
+#include <sofa/simulation/AnimateEndEvent.h>
 
 #include <sofa/defaulttype/Vec.h>
 #include <sofa/helper/gl/Texture.h>
@@ -48,10 +44,6 @@ namespace component
 namespace engine
 {
 
-using helper::vector;
-using helper::fixed_array;
-using defaulttype::Vec;
-using cimg_library::CImg;
 
 /**
  * This class computes a mesh from a depth map image
@@ -67,9 +59,9 @@ public:
 
     typedef SReal Real;
 
-    Data< Real > depthFactor;
-    Data< Real > minThreshold;
-    Data< Real > diffThreshold;
+    Data< Real > depthFactor; ///< Intensity to depth factor
+    Data< Real > minThreshold; ///< minimal depth for point creation
+    Data< Real > diffThreshold; ///< maximal depth variation for triangle creation
 
     typedef _ImageTypes ImageTypes;
     typedef typename ImageTypes::T T;
@@ -86,25 +78,25 @@ public:
     typedef helper::ReadAccessor<Data< TextureTypes > > raTexture;
     Data< TextureTypes > texImage;
 
-    typedef vector<Vec<3,Real> > SeqPositions;
+    typedef helper::vector<defaulttype::Vec<3,Real> > SeqPositions;
     typedef helper::ReadAccessor<Data< SeqPositions > > raPositions;
-    typedef helper::WriteAccessor<Data< SeqPositions > > waPositions;
-    Data< SeqPositions > position;
+    typedef helper::WriteOnlyAccessor<Data< SeqPositions > > waPositions;
+    Data< SeqPositions > position; ///< output positions
 
-    typedef fixed_array<Real,2> TexCoord;
-    typedef vector<TexCoord> SeqTexCoords;
+    typedef helper::fixed_array<Real,2> TexCoord;
+    typedef helper::vector<TexCoord> SeqTexCoords;
     typedef helper::ReadAccessor<Data< SeqTexCoords > > raTexCoords;
-    typedef helper::WriteAccessor<Data< SeqTexCoords > > waTexCoords;
-    Data< SeqTexCoords > texCoord;
-    Data< TexCoord > texOffset;
+    typedef helper::WriteOnlyAccessor<Data< SeqTexCoords > > waTexCoords;
+    Data< SeqTexCoords > texCoord; ///< output texture coordinates
+    Data< TexCoord > texOffset; ///< texture offsets (in [0,1])
 
     typedef typename core::topology::BaseMeshTopology::Triangle Triangle;
     typedef typename core::topology::BaseMeshTopology::SeqTriangles SeqTriangles;
     typedef helper::ReadAccessor<Data< SeqTriangles > > raTriangles;
-    typedef helper::WriteAccessor<Data< SeqTriangles > > waTriangles;
-    Data< SeqTriangles > triangles;
+    typedef helper::WriteOnlyAccessor<Data< SeqTriangles > > waTriangles;
+    Data< SeqTriangles > triangles; ///< output triangles
 
-    virtual std::string getTemplateName() const    { return templateName(this);    }
+    virtual std::string getTemplateName() const    override { return templateName(this);    }
     static std::string templateName(const DepthMapToMeshEngine<ImageTypes>* = NULL) { return ImageTypes::Name();    }
 
     DepthMapToMeshEngine()    :   Inherited()
@@ -135,7 +127,7 @@ public:
 #endif /* SOFA_NO_OPENGL */
     }
 
-    virtual void init()
+    virtual void init() override
     {
         addInput(&image);
         addInput(&transform);
@@ -143,15 +135,9 @@ public:
         addOutput(&texCoord);
         addOutput(&triangles);
         setDirtyValue();
-
-#ifndef SOFA_NO_OPENGL
-        texture = new helper::gl::Texture(new helper::io::Image,false);
-        texture->getImage()->init(texture_res,texture_res,32);
-        texture->init();
-#endif /* SOFA_NO_OPENGL */
     }
 
-    virtual void reinit() { update(); }
+    virtual void reinit() override { update(); }
 
 protected:
 
@@ -161,29 +147,30 @@ protected:
     static const unsigned texture_res=256;
 #endif /* SOFA_NO_OPENGL */
 
-    virtual void update()
+    virtual void update() override
     {
-        cleanDirty();
-
         raImage in(this->image);
         raTransform inT(this->transform);
         raTexture inTex(this->texImage);
         const unsigned int dimx=in->getDimensions()[0],dimy=in->getDimensions()[1];
+
+
+        cleanDirty();
 
         waPositions pos(this->position);
         waTexCoords tc(this->texCoord);
         waTriangles tri(this->triangles);
 
         // get image at time t
-        const CImg<T>& img = in->getCImg(this->time);
+        const cimg_library::CImg<T>& img = in->getCImg(this->time);
         Real f = this->depthFactor.getValue();
 
 #ifndef SOFA_NO_OPENGL
         // update texture
-        if(!inTex->isEmpty())
+        if(texture && !inTex->isEmpty())
         {
-            const CImg<T>& tex = inTex->getCImg(this->time);
-            CImg<unsigned char> plane=convertToUC( tex.get_resize(texture_res,texture_res,1,-100,1) );
+            const cimg_library::CImg<T>& tex = inTex->getCImg(this->time);
+            cimg_library::CImg<unsigned char> plane=convertToUC( tex.get_resize(texture_res,texture_res,1,-100,1) );
             cimg_forXY(plane,x,y)
             {
                 unsigned char *b=texture->getImage()->getPixels()+4*(y*texture_res+x);
@@ -199,7 +186,7 @@ protected:
         unsigned int count=0,p1,p2,p3;
         pos.resize(dimx*dimy);
         tc.resize(dimx*dimy);
-        vector<bool> isValid(dimx*dimy);
+        helper::vector<bool> isValid(dimx*dimy);
         Real cameraZ= 0.5; // camera position relative to image plane = offset for depth
         Real minT= minThreshold.getValue();
         for(unsigned int y=0; y<dimy; y++)
@@ -230,9 +217,9 @@ protected:
             }
     }
 
-    void handleEvent(sofa::core::objectmodel::Event *event)
+    void handleEvent(sofa::core::objectmodel::Event *event) override
     {
-        if ( dynamic_cast<simulation::AnimateEndEvent*>(event))
+        if (simulation::AnimateEndEvent::checkEventType(event))
         {
             raImage in(this->image);
             raTransform inT(this->transform);
@@ -249,9 +236,21 @@ protected:
         }
     }
 
-    virtual void draw(const core::visual::VisualParams* vparams)
+    virtual void draw(const core::visual::VisualParams* vparams) override
     {
 #ifndef SOFA_NO_OPENGL
+
+        // need a valid opengl context to initialize an opengl texture, a context is not always bound during the init phase so we init the texture here
+        if(!texture)
+        {
+            texture = new helper::gl::Texture(new helper::io::Image,false);
+            texture->getImage()->init(texture_res,texture_res,32);
+            texture->init();
+
+            // we need the texture to be updated
+            setDirtyValue();
+        }
+
         if (!vparams->displayFlags().getShowVisualModels()) return;
 
         raPositions pos(this->position);
@@ -275,10 +274,10 @@ protected:
         glBegin(GL_TRIANGLES);
         for (unsigned int i=0; i<tri.size(); ++i)
         {
-            const Vec<3,Real>& a = pos[ tri[i][0] ];
-            const Vec<3,Real>& b = pos[ tri[i][1] ];
-            const Vec<3,Real>& c = pos[ tri[i][2] ];
-            Vec<3,Real> n = cross((c-a),(b-a));	n.normalize();
+            const defaulttype::Vec<3,Real>& a = pos[ tri[i][0] ];
+            const defaulttype::Vec<3,Real>& b = pos[ tri[i][1] ];
+            const defaulttype::Vec<3,Real>& c = pos[ tri[i][2] ];
+            defaulttype::Vec<3,Real> n = cross((c-a),(b-a));	n.normalize();
             glNormal3d(n[0],n[1],n[2]);
 
             glTexCoord2d(tc[tri[i][0]][0],tc[tri[i][0]][1]); glVertex3d(a[0],a[1],a[2]);

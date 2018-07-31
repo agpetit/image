@@ -1,23 +1,20 @@
 /******************************************************************************
-*       SOFA, Simulation Open-Framework Architecture, version 1.0 beta 4      *
-*                (c) 2006-2009 MGH, INRIA, USTL, UJF, CNRS                    *
+*       SOFA, Simulation Open-Framework Architecture, development version     *
+*                (c) 2006-2018 INRIA, USTL, UJF, CNRS, MGH                    *
 *                                                                             *
-* This library is free software; you can redistribute it and/or modify it     *
+* This program is free software; you can redistribute it and/or modify it     *
 * under the terms of the GNU Lesser General Public License as published by    *
 * the Free Software Foundation; either version 2.1 of the License, or (at     *
 * your option) any later version.                                             *
 *                                                                             *
-* This library is distributed in the hope that it will be useful, but WITHOUT *
+* This program is distributed in the hope that it will be useful, but WITHOUT *
 * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or       *
 * FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License *
 * for more details.                                                           *
 *                                                                             *
 * You should have received a copy of the GNU Lesser General Public License    *
-* along with this library; if not, write to the Free Software Foundation,     *
-* Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA.          *
+* along with this program. If not, see <http://www.gnu.org/licenses/>.        *
 *******************************************************************************
-*                               SOFA :: Modules                               *
-*                                                                             *
 * Authors: The SOFA Team and external contributors (see Authors.txt)          *
 *                                                                             *
 * Contact information: contact@sofa-framework.org                             *
@@ -25,14 +22,13 @@
 #ifndef SOFA_IMAGE_ImageDataDisplay_H
 #define SOFA_IMAGE_ImageDataDisplay_H
 
-#include "initImage.h"
+#include <image/config.h>
 #include "ImageTypes.h"
 #include <sofa/core/DataEngine.h>
 #include <sofa/core/objectmodel/BaseObject.h>
 #include <sofa/defaulttype/Vec.h>
 #include <sofa/helper/SVector.h>
 
-#include <sofa/component/component.h>
 
 namespace sofa
 {
@@ -43,8 +39,6 @@ namespace component
 namespace engine
 {
 
-using helper::SVector;
-using cimg_library::CImg;
 
 /**
  * This class Store custom data in an image
@@ -61,20 +55,18 @@ public:
     typedef _InImageTypes InImageTypes;
     typedef typename InImageTypes::T Ti;
     typedef typename InImageTypes::imCoord imCoordi;
-    typedef helper::WriteAccessor<Data< InImageTypes > > waImagei;
     typedef helper::ReadAccessor<Data< InImageTypes > > raImagei;
 
     typedef _OutImageTypes OutImageTypes;
     typedef typename OutImageTypes::T To;
     typedef typename OutImageTypes::imCoord imCoordo;
-    typedef helper::WriteAccessor<Data< OutImageTypes > > waImageo;
-    typedef helper::ReadAccessor<Data< OutImageTypes > > raImageo;
+    typedef helper::WriteOnlyAccessor<Data< OutImageTypes > > waImageo;
 
     Data< InImageTypes > inputImage;
     Data< OutImageTypes > outputImage;
-    Data<SVector<SVector<To> > > VoxelData;
+    Data<helper::SVector<helper::SVector<To> > > VoxelData; ///< Data associed to each non null input voxel
 
-    virtual std::string getTemplateName() const    { return templateName(this);    }
+    virtual std::string getTemplateName() const    override { return templateName(this);    }
     static std::string templateName(const ImageDataDisplay<InImageTypes,OutImageTypes>* = NULL) { return InImageTypes::Name()+std::string(",")+OutImageTypes::Name(); }
 
     ImageDataDisplay()    :   Inherited()
@@ -88,7 +80,7 @@ public:
 
     virtual ~ImageDataDisplay() {}
 
-    virtual void init()
+    virtual void init() override
     {
         addInput(&VoxelData);
         addInput(&inputImage);
@@ -96,26 +88,25 @@ public:
         setDirtyValue();
     }
 
-    virtual void reinit() { update(); }
+    virtual void reinit() override { update(); }
 
 protected:
 
-    virtual void update()
+    virtual void update() override
     {
+        const helper::SVector<helper::SVector<To> >& dat = this->VoxelData.getValue();
+        raImagei in(this->inputImage);
+
         cleanDirty();
 
-        if(!this->VoxelData.getValue().size()) return;
-
-        const SVector<SVector<To> >& dat = this->VoxelData.getValue();
         waImageo out(this->outputImage);
-        raImagei in(this->inputImage);
         imCoordi dim = in->getDimensions();
         dim[InImageTypes::DIMENSION_T] = 1;
-        dim[InImageTypes::DIMENSION_S] = dat[0].size();
+        dim[InImageTypes::DIMENSION_S] = dat.size()?dat[0].size():1;
         out->setDimensions(dim);
 
-        const CImg<Ti>& inImg=in->getCImg();
-        CImg<To>& outImg=out->getCImg();
+        const cimg_library::CImg<Ti>& inImg=in->getCImg();
+        cimg_library::CImg<To>& outImg=out->getCImg();
         outImg.fill(0);
 
         unsigned int count=0;

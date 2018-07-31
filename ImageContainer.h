@@ -1,23 +1,20 @@
 /******************************************************************************
-*       SOFA, Simulation Open-Framework Architecture, version 1.0 beta 4      *
-*                (c) 2006-2009 MGH, INRIA, USTL, UJF, CNRS                    *
+*       SOFA, Simulation Open-Framework Architecture, development version     *
+*                (c) 2006-2018 INRIA, USTL, UJF, CNRS, MGH                    *
 *                                                                             *
-* This library is free software; you can redistribute it and/or modify it     *
+* This program is free software; you can redistribute it and/or modify it     *
 * under the terms of the GNU Lesser General Public License as published by    *
 * the Free Software Foundation; either version 2.1 of the License, or (at     *
 * your option) any later version.                                             *
 *                                                                             *
-* This library is distributed in the hope that it will be useful, but WITHOUT *
+* This program is distributed in the hope that it will be useful, but WITHOUT *
 * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or       *
 * FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License *
 * for more details.                                                           *
 *                                                                             *
 * You should have received a copy of the GNU Lesser General Public License    *
-* along with this library; if not, write to the Free Software Foundation,     *
-* Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA.          *
+* along with this program. If not, see <http://www.gnu.org/licenses/>.        *
 *******************************************************************************
-*                               SOFA :: Modules                               *
-*                                                                             *
 * Authors: The SOFA Team and external contributors (see Authors.txt)          *
 *                                                                             *
 * Contact information: contact@sofa-framework.org                             *
@@ -25,20 +22,22 @@
 #ifndef IMAGE_IMAGECONTAINER_H
 #define IMAGE_IMAGECONTAINER_H
 
-#include "initImage.h"
+#include <image/config.h>
 #include "ImageTypes.h"
 #include <limits.h>
 #include <sofa/defaulttype/Vec.h>
 #include <sofa/core/objectmodel/BaseObject.h>
 #include <sofa/core/objectmodel/DataFileName.h>
 #include <sofa/core/visual/VisualParams.h>
+#include <sofa/helper/system/gl.h>
 #include <sofa/defaulttype/BoundingBox.h>
 #include <sofa/core/objectmodel/Event.h>
-#include <sofa/simulation/common/AnimateBeginEvent.h>
-#include <sofa/simulation/common/AnimateEndEvent.h>
+#include <sofa/simulation/AnimateBeginEvent.h>
+#include <sofa/simulation/AnimateEndEvent.h>
 #include <sofa/defaulttype/Mat.h>
 #include <sofa/defaulttype/Quat.h>
 #include <sofa/helper/rmath.h>
+#include <sofa/helper/system/FileRepository.h>
 
 #ifdef SOFA_HAVE_ZLIB
 #include <zlib.h>
@@ -54,53 +53,59 @@ namespace component
 namespace container
 {
 
-using helper::vector;
-using defaulttype::Vec;
-using defaulttype::Vector3;
-using defaulttype::Mat;
-using cimg_library::CImg;
-
 
 /// Default implementation does not compile
-template <int imageTypeLabel>
+template <class ImageType>
 struct ImageContainerSpecialization
 {
 };
 
+/// forward declaration
+template<class ImageTypes> class ImageContainer;
 
-/// Specialization for regular Image
-template <>
-struct ImageContainerSpecialization<defaulttype::IMAGELABEL_IMAGE>
+template <class T>
+struct ImageContainerSpecialization< defaulttype::Image<T> >
 {
-    template<class ImageContainer>
-    static void constructor( ImageContainer* container )
+    typedef ImageContainer<defaulttype::Image<T>> ImageContainerT;
+
+    static void constructor( ImageContainerT* container )
     {
         container->f_listening.setValue(true);  // to update camera during animate
     }
 
-    template<class ImageContainer>
-    static void init( ImageContainer* container )
+    static void parse( ImageContainerT* container, sofa::core::objectmodel::BaseObjectDescription* /* arg */ = NULL )
     {
-        typedef typename ImageContainer::T T;
+        if( container->image.isSet() ) return; // image is set from data link
 
-        typename ImageContainer::waImage wimage(container->image);
+        // otherwise try to load it from a file
+        typename ImageContainerT::waImage wimage(container->image);
+        if( wimage->isEmpty() )
+            if( !container->load() )
+                container->loadCamera();
+    }
+
+    static void init( ImageContainerT* container )
+    {
+        // if the image is not set from data link
+        // and was not loaded from a file during parsing
+        // try to load it now (maybe the loading was data-dependant, like the filename)
+
+        typename ImageContainerT::waImage wimage(container->image);
         if( wimage->isEmpty() )
             if( !container->load() )
                 if( !container->loadCamera() )
                 {
-                    wimage->getCImgList().push_back(CImg<T>());
+                    wimage->getCImgList().push_back(cimg_library::CImg<T>());
                     container->serr << "no input image" << container->sendl;
                 }
     }
 
-    template<class ImageContainer>
-    static bool load( ImageContainer* container, std::string fname )
+    static bool load( ImageContainerT* container, std::string fname )
     {
-        typedef typename ImageContainer::T T;
-        typedef typename ImageContainer::Real Real;
+        typedef typename ImageContainerT::Real Real;
 
-        typename ImageContainer::waImage wimage(container->image);
-        typename ImageContainer::waTransform wtransform(container->transform);
+        typename ImageContainerT::waImage wimage(container->image);
+        typename ImageContainerT::waTransform wtransform(container->transform);
 
         // read image
 #ifndef __PS3__
@@ -110,7 +115,7 @@ struct ImageContainerSpecialization<defaulttype::IMAGELABEL_IMAGE>
         {
             float voxsize[3];
             float translation[3]={0.,0.,0.}, rotation[3]={0.,0.,0.};
-            CImg<T> img = cimg_library::_load_gz_inr<T>(NULL, fname.c_str(), voxsize, translation, rotation);
+            cimg_library::CImg<T> img = cimg_library::_load_gz_inr<T>(NULL, fname.c_str(), voxsize, translation, rotation);
             wimage->getCImgList().push_back(img);
 
             if (!container->transformIsSet)
@@ -119,14 +124,10 @@ struct ImageContainerSpecialization<defaulttype::IMAGELABEL_IMAGE>
                 for(unsigned int i=0;i<3;i++) wtransform->getScale()[i]=(Real)voxsize[i];
                 for(unsigned int i=0;i<3;i++) wtransform->getTranslation()[i]= (Real)translation[i];
 
-                Mat<3,3,Real> R;
+                defaulttype::Mat<3,3,Real> R;
                 R = container->RotVec3DToRotMat3D(rotation);
                 helper::Quater< float > q; q.fromMatrix(R);
-                // wtransform->getRotation()=q.toEulerVector() * (Real)180.0 / (Real)M_PI ;  //  this does not convert quaternion to euler angles
-                if(q[0]*q[0]+q[1]*q[1]==0.5 || q[1]*q[1]+q[2]*q[2]==0.5) {q[3]+=10-3; q.normalize();} // hack to avoid singularities
-                wtransform->getRotation()[0]=atan2(2*(q[3]*q[0]+q[1]*q[2]),1-2*(q[0]*q[0]+q[1]*q[1])) * (Real)180.0 / (Real)M_PI;
-                wtransform->getRotation()[1]=asin(2*(q[3]*q[1]-q[2]*q[0])) * (Real)180.0 / (Real)M_PI;
-                wtransform->getRotation()[2]=atan2(2*(q[3]*q[2]+q[0]*q[1]),1-2*(q[1]*q[1]+q[2]*q[2])) * (Real)180.0 / (Real)M_PI;
+                wtransform->getRotation()=q.toEulerVector() * (Real)180.0 / (Real)M_PI ;
             }
             //			Real t0 = wtransform->getRotation()[0];
             //			Real t1 = wtransform->getRotation()[1];
@@ -142,19 +143,15 @@ struct ImageContainerSpecialization<defaulttype::IMAGELABEL_IMAGE>
                 if(fname.find(".raw")!=std::string::npos || fname.find(".RAW")!=std::string::npos || fname.find(".Raw")!=std::string::npos)      fname.replace(fname.find_last_of('.')+1,fname.size(),"mhd");
 
                 double scale[3]={1.,1.,1.},translation[3]={0.,0.,0.},affine[9]={1.,0.,0.,0.,1.,0.,0.,0.,1.},offsetT=0.,scaleT=1.;
-                bool isPerspective=false;
+                int isPerspective=0;
                 wimage->getCImgList().assign(cimg_library::load_metaimage<T,double>(fname.c_str(),scale,translation,affine,&offsetT,&scaleT,&isPerspective));
                 if (!container->transformIsSet)
                 {
                     for(unsigned int i=0;i<3;i++) wtransform->getScale()[i]=(Real)scale[i];
                     for(unsigned int i=0;i<3;i++) wtransform->getTranslation()[i]=(Real)translation[i];
-                    Mat<3,3,Real> R; for(unsigned int i=0;i<3;i++) for(unsigned int j=0;j<3;j++) R[i][j]=(Real)affine[3*i+j];
+                    defaulttype::Mat<3,3,Real> R; for(unsigned int i=0;i<3;i++) for(unsigned int j=0;j<3;j++) R[i][j]=(Real)affine[3*i+j];
                     helper::Quater< Real > q; q.fromMatrix(R);
-                    // wtransform->getRotation()=q.toEulerVector() * (Real)180.0 / (Real)M_PI ;  //  container does not convert quaternion to euler angles
-                    if(q[0]*q[0]+q[1]*q[1]==0.5 || q[1]*q[1]+q[2]*q[2]==0.5) {q[3]+=10-3; q.normalize();} // hack to avoid singularities
-                    wtransform->getRotation()[0]=atan2(2*(q[3]*q[0]+q[1]*q[2]),1-2*(q[0]*q[0]+q[1]*q[1])) * (Real)180.0 / (Real)M_PI;
-                    wtransform->getRotation()[1]=asin(2*(q[3]*q[1]-q[2]*q[0])) * (Real)180.0 / (Real)M_PI;
-                    wtransform->getRotation()[2]=atan2(2*(q[3]*q[2]+q[0]*q[1]),1-2*(q[1]*q[1]+q[2]*q[2])) * (Real)180.0 / (Real)M_PI;
+                    wtransform->getRotation()=q.toEulerVector() * (Real)180.0 / (Real)M_PI ;
                     wtransform->getOffsetT()=(Real)offsetT;
                     wtransform->getScaleT()=(Real)scaleT;
                     wtransform->isPerspective()=isPerspective;
@@ -168,27 +165,27 @@ struct ImageContainerSpecialization<defaulttype::IMAGELABEL_IMAGE>
                 if (!fileStream.is_open()) { container->serr << "Cannot open " << fname << container->sendl; return false; }
                 std::string str;
                 fileStream >> str;	char vtype[32]; fileStream.getline(vtype,32);
-                Vec<3,unsigned int> dim;  fileStream >> str; fileStream >> dim;
+                defaulttype::Vec<3,unsigned int> dim;  fileStream >> str; fileStream >> dim;
                 if (!container->transformIsSet)
                 {
-                    Vec<3,double> translation; fileStream >> str; fileStream >> translation;        for(unsigned int i=0;i<3;i++) wtransform->getTranslation()[i]=(Real)translation[i];
-                    Vec<3,double> scale; fileStream >> str; fileStream >> scale;     for(unsigned int i=0;i<3;i++) wtransform->getScale()[i]=(Real)scale[i];
+                    defaulttype::Vec<3,double> translation; fileStream >> str; fileStream >> translation;        for(unsigned int i=0;i<3;i++) wtransform->getTranslation()[i]=(Real)translation[i];
+                    defaulttype::Vec<3,double> scale; fileStream >> str; fileStream >> scale;     for(unsigned int i=0;i<3;i++) wtransform->getScale()[i]=(Real)scale[i];
                 }
                 fileStream.close();
 
                 std::string imgName (fname);  imgName.replace(imgName.find_last_of('.')+1,imgName.size(),"raw");
-                wimage->getCImgList().push_back(CImg<T>().load_raw(imgName.c_str(),dim[0],dim[1],dim[2]));
+                wimage->getCImgList().push_back(cimg_library::CImg<T>().load_raw(imgName.c_str(),dim[0],dim[1],dim[2]));
             }
             else if(fname.find(".cimg")!=std::string::npos || fname.find(".CIMG")!=std::string::npos || fname.find(".Cimg")!=std::string::npos || fname.find(".CImg")!=std::string::npos)
                 wimage->getCImgList().load_cimg(fname.c_str());
             else if(fname.find(".par")!=std::string::npos || fname.find(".rec")!=std::string::npos)
                 wimage->getCImgList().load_parrec(fname.c_str());
             else if(fname.find(".avi")!=std::string::npos || fname.find(".mov")!=std::string::npos || fname.find(".asf")!=std::string::npos || fname.find(".divx")!=std::string::npos || fname.find(".flv")!=std::string::npos || fname.find(".mpg")!=std::string::npos || fname.find(".m1v")!=std::string::npos || fname.find(".m2v")!=std::string::npos || fname.find(".m4v")!=std::string::npos || fname.find(".mjp")!=std::string::npos || fname.find(".mkv")!=std::string::npos || fname.find(".mpe")!=std::string::npos || fname.find(".movie")!=std::string::npos || fname.find(".ogm")!=std::string::npos || fname.find(".ogg")!=std::string::npos || fname.find(".qt")!=std::string::npos || fname.find(".rm")!=std::string::npos || fname.find(".vob")!=std::string::npos || fname.find(".wmv")!=std::string::npos || fname.find(".xvid")!=std::string::npos || fname.find(".mpeg")!=std::string::npos )
-                wimage->getCImgList().load_ffmpeg(fname.c_str());
+                wimage->getCImgList().load_ffmpeg_external(fname.c_str());
             else if (fname.find(".hdr")!=std::string::npos || fname.find(".nii")!=std::string::npos)
             {
                 float voxsize[3];
-                wimage->getCImgList().push_back(CImg<T>().load_analyze(fname.c_str(),voxsize));
+                wimage->getCImgList().push_back(cimg_library::CImg<T>().load_analyze(fname.c_str(),voxsize));
                 if (!container->transformIsSet)
                     for(unsigned int i=0;i<3;i++) wtransform->getScale()[i]=(Real)voxsize[i];
                 readNiftiHeader(container, fname);
@@ -196,11 +193,11 @@ struct ImageContainerSpecialization<defaulttype::IMAGELABEL_IMAGE>
             else if (fname.find(".inr")!=std::string::npos)
             {
                 float voxsize[3];
-                wimage->getCImgList().push_back(CImg<T>().load_inr(fname.c_str(),voxsize));
+                wimage->getCImgList().push_back(cimg_library::CImg<T>().load_inr(fname.c_str(),voxsize));
                 if (!container->transformIsSet)
                     for(unsigned int i=0;i<3;i++) wtransform->getScale()[i]=(Real)voxsize[i];
             }
-            else wimage->getCImgList().push_back(CImg<T>().load(fname.c_str()));
+            else wimage->getCImgList().push_back(cimg_library::CImg<T>().load(fname.c_str()));
 
         if(!wimage->isEmpty()) container->sout << "Loaded image " << fname <<" ("<< wimage->getCImg().pixel_type() <<")"  << container->sendl;
         else return false;
@@ -208,14 +205,12 @@ struct ImageContainerSpecialization<defaulttype::IMAGELABEL_IMAGE>
         return true;
     }
 
-    //    template<class ImageContainer>
-    //    static bool load( ImageContainer* container, std::FILE* const file, std::string fname)
+    //    static bool load( ImageContainerT* container, std::FILE* const file, std::string fname)
     //    {
-    //        typedef typename ImageContainer::T T;
-    //        typedef typename ImageContainer::Real Real;
+    //        typedef typename ImageContainerT::Real Real;
 
-    //        typename ImageContainer::waImage wimage(container->image);
-    //        typename ImageContainer::waTransform wtransform(container->transform);
+    //        typename ImageContainerT::waImage wimage(container->image);
+    //        typename ImageContainerT::waTransform wtransform(container->transform);
 
     //        if(fname.find(".cimg")!=std::string::npos || fname.find(".CIMG")!=std::string::npos || fname.find(".Cimg")!=std::string::npos || fname.find(".CImg")!=std::string::npos)
     //            wimage->getCImgList().load_cimg(file);
@@ -242,20 +237,17 @@ struct ImageContainerSpecialization<defaulttype::IMAGELABEL_IMAGE>
     //        return true;
     //    }
 
-    template<class ImageContainer>
-    static bool loadCamera( ImageContainer* container )
+    static bool loadCamera( ImageContainerT* container )
     {
-        //        typedef typename ImageContainer::T T;
-
         if( container->m_filename.isSet() ) return false;
         if( container->name.getValue().find("CAMERA") == std::string::npos ) return false;
 
 #ifdef cimg_use_opencv
-        typename ImageContainer::waImage wimage(container->image);
+        typename ImageContainerT::waImage wimage(container->image);
         if(wimage->isEmpty() wimage->getCImgList().push_back(CImg<T>().load_camera());
                 else wimage->getCImgList()[0].load_camera();
                 if(!wimage->isEmpty())  return true;  else return false;
-        #else
+#else
         return false;
 #endif
     }
@@ -264,11 +256,10 @@ struct ImageContainerSpecialization<defaulttype::IMAGELABEL_IMAGE>
      * CImg only allows to get the voxel size of a nifti image, whereas this function
      * gives access to the whole structure of the header to get rotation and translation.
      */
-    template<class ImageContainer>
-    static void readNiftiHeader(ImageContainer* container, std::string fname)
+    static void readNiftiHeader(ImageContainerT* container, std::string fname)
     {
-        typedef typename ImageContainer::Real Real;
-        typename ImageContainer::waTransform wtransform(container->transform);
+        typedef typename ImageContainerT::Real Real;
+        typename ImageContainerT::waTransform wtransform(container->transform);
 
         struct transformData{
             float b;
@@ -299,13 +290,10 @@ struct ImageContainerSpecialization<defaulttype::IMAGELABEL_IMAGE>
             Real d = (Real)data.d;
             Real a = sqrt(1.0 - (b*b+c*c+d*d));
             helper::Quater<Real> q(a,b,c,d);
-            //            wtransform->getRotation()=q.toEulerVector() * (Real)180.0 / (Real)M_PI ; //  this does not convert quaternion to euler angles
-            if(q[0]*q[0]+q[1]*q[1]==0.5 || q[1]*q[1]+q[2]*q[2]==0.5) {q[3]+=10-3; q.normalize();} // hack to avoid singularities
+
             if (!container->transformIsSet)
             {
-                wtransform->getRotation()[0]=atan2(2*(q[3]*q[0]+q[1]*q[2]),1-2*(q[0]*q[0]+q[1]*q[1])) * (Real)180.0 / (Real)M_PI;
-                wtransform->getRotation()[1]=asin(2*(q[3]*q[1]-q[2]*q[0])) * (Real)180.0 / (Real)M_PI;
-                wtransform->getRotation()[2]=atan2(2*(q[3]*q[2]+q[0]*q[1]),1-2*(q[1]*q[1]+q[2]*q[2])) * (Real)180.0 / (Real)M_PI;
+                wtransform->getRotation()=q.toEulerVector() * (Real)180.0 / (Real)M_PI ;
             }
         }
 
@@ -338,11 +326,10 @@ struct ImageContainerSpecialization<defaulttype::IMAGELABEL_IMAGE>
    *
    */
 template<class _ImageTypes>
-class ImageContainer : public virtual core::objectmodel::BaseObject
+class ImageContainer : public core::objectmodel::BaseObject
 {
 
-    friend struct ImageContainerSpecialization<defaulttype::IMAGELABEL_IMAGE>;
-    friend struct ImageContainerSpecialization<defaulttype::IMAGELABEL_BRANCHINGIMAGE>;
+    friend struct ImageContainerSpecialization<_ImageTypes>;
 
 public:
     typedef core::objectmodel::BaseObject Inherited;
@@ -354,38 +341,38 @@ public:
     typedef typename ImageTypes::imCoord imCoord;
     typedef helper::WriteAccessor<Data< ImageTypes > > waImage;
     typedef helper::ReadAccessor<Data< ImageTypes > > raImage;
-    Data< ImageTypes > image;
+    Data< ImageTypes > image; ///< image
 
     // transform data
     typedef SReal Real;
     typedef defaulttype::ImageLPTransform<Real> TransformType;
     typedef helper::WriteAccessor<Data< TransformType > > waTransform;
     typedef helper::ReadAccessor<Data< TransformType > > raTransform;
-    Data< TransformType > transform;
+    Data< TransformType > transform; ///< 12-param vector for trans, rot, scale, ...
 
     // input file
     sofa::core::objectmodel::DataFileName m_filename;
 
-    Data<bool> drawBB;
+    Data<bool> drawBB; ///< draw bounding box
 
     /**
     * If true, the container will attempt to load a sequence of images starting from the file given by filename
     */
-    Data<bool> sequence;
+    Data<bool> sequence; ///< load a sequence of images
     /**
     * The number of frames of the sequence to be loaded.
     */
-    Data<unsigned int> nFrames;
+    Data<unsigned int> nFrames; ///< The number of frames of the sequence to be loaded. Default is the entire sequence.
 
 
-    virtual std::string getTemplateName() const	{ return templateName(this); }
+    virtual std::string getTemplateName() const	override { return templateName(this); }
     static std::string templateName(const ImageContainer<ImageTypes>* = NULL) {	return ImageTypes::Name(); }
 
     ImageContainer() : Inherited()
       , image(initData(&image,ImageTypes(),"image","image"))
       , transform(initData(&transform, "transform" , "12-param vector for trans, rot, scale, ..."))
       , m_filename(initData(&m_filename,"filename","Image file"))
-      , drawBB(initData(&drawBB,true,"drawBB","draw bounding box"))
+      , drawBB(initData(&drawBB,false,"drawBB","draw bounding box"))
       , sequence(initData(&sequence, false, "sequence", "load a sequence of images"))
       , nFrames (initData(&nFrames, "numberOfFrames", "The number of frames of the sequence to be loaded. Default is the entire sequence."))
       , transformIsSet (false)
@@ -396,7 +383,7 @@ public:
         this->transform.setGroup("Transform");
         this->transform.unset();
 
-        ImageContainerSpecialization<ImageTypes::label>::constructor( this );
+        ImageContainerSpecialization<ImageTypes>::constructor( this );
     }
 
 
@@ -410,8 +397,10 @@ public:
 
     bool transformIsSet;
 
-    virtual void init()
+    virtual void parse(sofa::core::objectmodel::BaseObjectDescription *arg) override
     {
+        Inherited::parse(arg);
+
         this->transformIsSet = false;
         if (this->transform.isSet()) this->transformIsSet = true;
         if (!this->transformIsSet) this->transform.unset();
@@ -421,10 +410,14 @@ public:
         else
             sout << "Transform is NOT set" << sendl;
 
+        ImageContainerSpecialization<ImageTypes>::parse( this, arg );
+    }
 
-        ImageContainerSpecialization<ImageTypes::label>::init( this );
+    virtual void init() override
+    {
+        ImageContainerSpecialization<ImageTypes>::init( this );
 
-        waImage wimage(this->image);
+        raImage wimage(this->image);
         waTransform wtransform(this->transform);
         wtransform->setCamPos((Real)(wimage->getDimensions()[0]-1)/2.0,(Real)(wimage->getDimensions()[1]-1)/2.0); // for perspective transforms
         wtransform->update(); // update of internal data
@@ -436,11 +429,11 @@ public:
 protected:
 
 
-    Mat<3,3,Real> RotVec3DToRotMat3D(float *rotVec)
+    defaulttype::Mat<3,3,Real> RotVec3DToRotMat3D(float *rotVec)
     {
-        Mat<3,3,Real> rotMatrix;
+        defaulttype::Mat<3,3,Real> rotMatrix;
         float c, s, k1, k2;
-        float TH_TINY = 0.00001;
+        float TH_TINY = 0.00001f;
 
         float theta2 =  rotVec[0]*rotVec[0] + rotVec[1]*rotVec[1] + rotVec[2]*rotVec[2];
         float theta = sqrt( theta2 );
@@ -451,9 +444,9 @@ protected:
             k2 = (1 - c) / theta2;
         }
         else {  // Taylor expension around theta = 0
-            k2 = 1.0/2.0 - theta2/24.0;
-            c = 1.0 - theta2*k2;
-            k1 = 1.0 - theta2/6;
+            k2 = 1.0f/2.0f - theta2/24.0f;
+            c = 1.0f - theta2*k2;
+            k1 = 1.0f - theta2/6.0f;
         }
 
         /* I + M*Mt */
@@ -500,49 +493,50 @@ protected:
 
     bool load(std::string fname)
     {
-        return ImageContainerSpecialization<ImageTypes::label>::load( this, fname );
+        return ImageContainerSpecialization<ImageTypes>::load( this, fname );
     }
 
     //    bool load(std::FILE* const file, std::string fname)
     //    {
-    //       return ImageContainerSpecialization<ImageTypes::label>::load( this, file, fname );
+    //       return ImageContainerSpecialization<ImageTypes>::load( this, file, fname );
     //    }
 
     bool loadCamera()
     {
-        return ImageContainerSpecialization<ImageTypes::label>::loadCamera( this );
+        return ImageContainerSpecialization<ImageTypes>::loadCamera( this );
     }
 
-    void handleEvent(sofa::core::objectmodel::Event *event)
+    void handleEvent(sofa::core::objectmodel::Event *event) override
     {
-        if (dynamic_cast<simulation::AnimateEndEvent*>(event))
+        if (simulation::AnimateEndEvent::checkEventType(event))
             loadCamera();
     }
 
 
-    void getCorners(Vec<8,Vector3> &c) // get image corners
+    void getCorners(defaulttype::Vec<8,defaulttype::Vector3> &c) // get image corners
     {
         raImage rimage(this->image);
         const imCoord dim= rimage->getDimensions();
 
-        Vec<8,Vector3> p;
-        p[0]=Vector3(-0.5,-0.5,-0.5);
-        p[1]=Vector3(dim[0]-0.5,-0.5,-0.5);
-        p[2]=Vector3(-0.5,dim[1]-0.5,-0.5);
-        p[3]=Vector3(dim[0]-0.5,dim[1]-0.5,-0.5);
-        p[4]=Vector3(-0.5,-0.5,dim[2]-0.5);
-        p[5]=Vector3(dim[0]-0.5,-0.5,dim[2]-0.5);
-        p[6]=Vector3(-0.5,dim[1]-0.5,dim[2]-0.5);
-        p[7]=Vector3(dim[0]-0.5,dim[1]-0.5,dim[2]-0.5);
+        defaulttype::Vec<8,defaulttype::Vector3> p;
+        p[0]=defaulttype::Vector3(-0.5,-0.5,-0.5);
+        p[1]=defaulttype::Vector3(dim[0]-0.5,-0.5,-0.5);
+        p[2]=defaulttype::Vector3(-0.5,dim[1]-0.5,-0.5);
+        p[3]=defaulttype::Vector3(dim[0]-0.5,dim[1]-0.5,-0.5);
+        p[4]=defaulttype::Vector3(-0.5,-0.5,dim[2]-0.5);
+        p[5]=defaulttype::Vector3(dim[0]-0.5,-0.5,dim[2]-0.5);
+        p[6]=defaulttype::Vector3(-0.5,dim[1]-0.5,dim[2]-0.5);
+        p[7]=defaulttype::Vector3(dim[0]-0.5,dim[1]-0.5,dim[2]-0.5);
 
         raTransform rtransform(this->transform);
         for(unsigned int i=0;i<p.size();i++) c[i]=rtransform->fromImage(p[i]);
     }
 
-    virtual void computeBBox(const core::ExecParams*  params )
+    virtual void computeBBox(const core::ExecParams*  params, bool onlyVisible=false ) override
     {
-        if (!drawBB.getValue()) return;
-        Vec<8,Vector3> c;
+        if( onlyVisible && !drawBB.getValue()) return;
+
+        defaulttype::Vec<8,defaulttype::Vector3> c;
         getCorners(c);
 
         Real bbmin[3]  = {c[0][0],c[0][1],c[0][2]} , bbmax[3]  = {c[0][0],c[0][1],c[0][2]};
@@ -555,7 +549,7 @@ protected:
         this->f_bbox.setValue(params,sofa::defaulttype::TBoundingBox<Real>(bbmin,bbmax));
     }
 
-    void draw(const core::visual::VisualParams* vparams)
+    void draw(const core::visual::VisualParams* vparams) override
     {
 #ifndef SOFA_NO_OPENGL
         // draw bounding box
@@ -573,7 +567,7 @@ protected:
         glColor4fv(color);
         glLineWidth(2.0);
 
-        Vec<8,Vector3> c;
+        defaulttype::Vec<8,defaulttype::Vector3> c;
         getCorners(c);
 
         glBegin(GL_LINE_LOOP);	glVertex3d(c[0][0],c[0][1],c[0][2]); glVertex3d(c[1][0],c[1][1],c[1][2]); glVertex3d(c[3][0],c[3][1],c[3][2]); glVertex3d(c[2][0],c[2][1],c[2][2]);	glEnd ();

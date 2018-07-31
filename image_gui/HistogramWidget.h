@@ -1,23 +1,20 @@
 /******************************************************************************
-*       SOFA, Simulation Open-Framework Architecture, version 1.0 beta 4      *
-*                (c) 2006-2009 MGH, INRIA, USTL, UJF, CNRS                    *
+*       SOFA, Simulation Open-Framework Architecture, development version     *
+*                (c) 2006-2018 INRIA, USTL, UJF, CNRS, MGH                    *
 *                                                                             *
-* This library is free software; you can redistribute it and/or modify it     *
+* This program is free software; you can redistribute it and/or modify it     *
 * under the terms of the GNU Lesser General Public License as published by    *
 * the Free Software Foundation; either version 2.1 of the License, or (at     *
 * your option) any later version.                                             *
 *                                                                             *
-* This library is distributed in the hope that it will be useful, but WITHOUT *
+* This program is distributed in the hope that it will be useful, but WITHOUT *
 * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or       *
 * FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License *
 * for more details.                                                           *
 *                                                                             *
 * You should have received a copy of the GNU Lesser General Public License    *
-* along with this library; if not, write to the Free Software Foundation,     *
-* Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA.          *
+* along with this program. If not, see <http://www.gnu.org/licenses/>.        *
 *******************************************************************************
-*                               SOFA :: Modules                               *
-*                                                                             *
 * Authors: The SOFA Team and external contributors (see Authors.txt)          *
 *                                                                             *
 * Contact information: contact@sofa-framework.org                             *
@@ -25,27 +22,17 @@
 #ifndef SOFA_IMAGE_HISTOGRAMWIDGET_H
 #define SOFA_IMAGE_HISTOGRAMWIDGET_H
 
-#include "initImage_gui.h"
+#include <image/image_gui/config.h>
 #include <sofa/gui/qt/DataWidget.h>
 #include <sofa/gui/qt/SimpleDataWidget.h>
 
-#ifdef SOFA_QT4
 #include <QLabel>
 #include <QImage>
 #include <QSlider>
 #include <QString>
 #include <QGraphicsView>
 #include <QGraphicsScene>
-#include <QtGui>
-#else
-#include <qlabel.h>
-#include <qimage.h>
-#include <qslider.h>
-#include <qstring.h>
-#include <qgraphicsView.h>
-#include <qgraphicsscene.h>
-#include <qtgui.h>
-#endif
+
 
 #include "../ImageTypes.h"
 #include <sofa/helper/vector.h>
@@ -59,9 +46,6 @@ namespace gui
 {
 namespace qt
 {
-
-using cimg_library::CImg;
-using defaulttype::Vec;
 
 //-----------------------------------------------------------------------------------------------//
 //  data widget -> generate qimage from Data<histogram> and show info (min,max,mouse position)
@@ -95,7 +79,7 @@ public:
     typedef DataType Histotype;
     typedef typename Histotype::T T;
 
-    THistogramSetting(QWidget * parent )	:histo(NULL),channel(0),channelmax(0),currentpos(0),clamp(Vec<2,T>(0,0))
+    THistogramSetting(QWidget * parent )	:histo(NULL),channel(0),channelmax(0),currentpos(0),clamp(defaulttype::Vec<2,T>(0,0))
     {
         label1=new QLabel(parent);
         label2=new QLabel(parent);
@@ -103,22 +87,22 @@ public:
 
         QHBoxLayout *layout = new QHBoxLayout(parent);
         layout->setMargin(0);
-        layout->add(label1);
+        layout->addWidget(label1);
         layout->addStretch();
-        layout->add(label2);
+        layout->addWidget(label2);
         layout->addStretch();
-        layout->add(label3);
+        layout->addWidget(label3);
         widget = new QWidget(parent);
         widget->setLayout(layout);
     }
 
-    virtual ~THistogramSetting() {};
+    virtual ~THistogramSetting() {}
 
     void readFromData(const Histotype& d0)
     {
         this->histo=&d0;
         if(!this->histo) return;
-        this->cimg=CImg<unsigned char>(3,this->histo->getImage().width(),this->histo->getImage().height());
+        this->cimg=cimg_library::CImg<unsigned char>(3,this->histo->getImage().width(),this->histo->getImage().height());
         this->img=QImage(cimg.data(),cimg.height(),cimg.depth(),QImage::Format_RGB888);
         this->channelmax=this->histo->getImage().spectrum()-1;
         this->clamp=this->histo->getClamp();
@@ -180,12 +164,12 @@ public:
 
 protected:
     const Histotype* histo;
-    CImg<unsigned char> cimg; // Internal cimage memory shared with Qimage
+    cimg_library::CImg<unsigned char> cimg; // Internal cimage memory shared with Qimage
 
     unsigned int channel;
     unsigned int channelmax;
     T currentpos;
-    Vec<2,T> clamp;
+    defaulttype::Vec<2,T> clamp;
 
     QLabel *label1;
     QLabel *label2;
@@ -279,9 +263,9 @@ public:
         QHBoxLayout *layout = new QHBoxLayout(this);
         layout->setMargin(0);
         layout->setSpacing(10);
-        layout->add(labelName);
-        layout->add(slider);
-        layout->add(label);
+        layout->addWidget(labelName);
+        layout->addWidget(slider);
+        layout->addWidget(label);
     }
 
     void setRange(const int minimum, const int maximum) 	{	slider->setRange(minimum,maximum); }
@@ -336,7 +320,8 @@ public:
     bool createLayout( QLayout* layout)
     {
         if ( container_layout != NULL ) return false;
-        container_layout = new Layout(layout);
+        container_layout = new Layout();
+        layout->addItem(container_layout);
         return true;
     }
 
@@ -364,9 +349,9 @@ public:
     void insertWidgets()
     {
         assert(container_layout);
-        if(graph) container_layout->add(graph);
-        if(setting) container_layout->add(setting->getWidget());
-        if(options) container_layout->add(options);
+        if(graph) container_layout->addWidget(graph);
+        if(setting) container_layout->addWidget(setting->getWidget());
+        if(options) container_layout->addWidget(options);
     }
 };
 

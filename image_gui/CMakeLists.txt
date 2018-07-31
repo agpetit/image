@@ -1,48 +1,42 @@
-include(${SOFA_CMAKE_DIR}/preProject.cmake)
+cmake_minimum_required(VERSION 3.1)
+project(image_gui)
 
+set(HEADER_FILES
+    ImageTransformWidget.h
+    config.h
+)
 
-if(SOFA-LIB_GUI_QT)
+set(MOC_HEADER_FILES
+    HistogramWidget.h
+    ImagePlaneWidget.h
+    VectorVisualizationWidget.h
+)
 
-    # these header files need MOCcing
-    set(HEADER_MOC_FILES
-        ImagePlaneWidget.h
-        HistogramWidget.h
-        # QImageMouseButtonsWidget.h
-        VectorVisualizationWidget.h)
+set(SOURCE_FILES
+    HistogramWidget.cpp
+    ImagePlaneWidget.cpp
+    ImageTransformWidget.cpp
+    VectorVisualizationWidget.cpp
+    initImage_gui.cpp
+)
 
+include(../imagetoolbox/imagetoolbox.cmake)
 
-    # following files do not need MOCcing
-    list(APPEND HEADER_FILES
-        initImage_gui.h
-        ImageTransformWidget.h)
+find_package(SofaGui REQUIRED QUIET)
 
-
-    set(SOURCE_FILES
-        initImage_gui.cpp
-        ImagePlaneWidget.cpp
-        ImageTransformWidget.cpp
-        HistogramWidget.cpp
-        # QImageMouseButtonsWidget.cpp
-        VectorVisualizationWidget.cpp)
-
-
-    include(../imagetoolbox/imagetoolbox.cmake)
-
-    UseQt()
-    SOFA_QT4_WRAP_CPP(MOC_FILES ${HEADER_MOC_FILES})
-
-
-    # make mocced header / form files path from absolute to relative
-    ToRelativePath(MOC_FILES "${CMAKE_CURRENT_SOURCE_DIR}" "${MOC_FILES}")
-
-    set(MOC_FILES_GROUP "Generated")
-
-
-    add_library(${PROJECT_NAME} SHARED ${HEADER_FILES} ${HEADER_MOC_FILES} ${MOC_FILES} ${SOURCE_FILES} ${README_FILES})
-
-    AddCompilerDefinitions("SOFA_BUILD_IMAGE_GUI")
-    AddLinkerDependencies(SofaGuiQt image ${OPENGL_LIBRARIES})
-
+find_package(Qt5 COMPONENTS Core Gui Widgets QUIET)
+if(Qt5Core_FOUND)
+    qt5_wrap_cpp(MOC_FILES ${MOC_HEADER_FILES})
+else()
+    find_package(Qt4 COMPONENTS qtcore)
+    qt4_wrap_cpp(MOC_FILES ${MOC_HEADER_FILES})
 endif()
 
-include(${SOFA_CMAKE_DIR}/postProject.cmake)
+set(MOC_FILES_GROUP "Generated")
+
+add_definitions("-DSOFA_BUILD_IMAGE_GUI")
+add_library(${PROJECT_NAME} SHARED ${HEADER_FILES} ${MOC_HEADER_FILES} ${MOC_FILES} ${SOURCE_FILES})
+target_link_libraries(${PROJECT_NAME} image ${OPENGL_LIBRARIES} SofaGuiQt)
+set_target_properties(${PROJECT_NAME} PROPERTIES DEBUG_POSTFIX _d)
+
+# TODO: install rules

@@ -3,19 +3,23 @@
 #ifndef LABELPOINTSBYSECTIONIMAGETOOLBOX_H
 #define LABELPOINTSBYSECTIONIMAGETOOLBOX_H
 
-#include <sofa/component/component.h>
+#include <QDataStream>
+#include "../labelimagetoolbox.h"
+
 #include <sofa/core/DataEngine.h>
 #include <sofa/core/objectmodel/BaseObject.h>
 #include <sofa/core/objectmodel/BaseObjectDescription.h>
 #include <sofa/core/objectmodel/DataFileName.h>
 
 #include "labelpointsbysectionimagetoolboxaction.h"
-#include "../labelimagetoolbox.h"
+#include <sofa/helper/system/FileRepository.h>
+
 #include <string>
 #include <cstring>
 
+#include <QDockWidget>
 
-#include "initImage_gui.h"
+#include <image/image_gui/config.h>
 
 
 
@@ -48,7 +52,7 @@ public:
     
     }
     
-    virtual void init()
+    virtual void init() override
     {
         addOutput(&d_ip);
         addOutput(&d_p);
@@ -58,7 +62,7 @@ public:
         
     }
     
-    virtual sofa::gui::qt::LabelImageToolBoxAction* createTBAction(QWidget*parent=NULL)
+    virtual sofa::gui::qt::LabelImageToolBoxAction* createTBAction(QWidget*parent=NULL) override
     {
         sofa::gui::qt::LabelPointsBySectionImageToolBoxAction * t = new sofa::gui::qt::LabelPointsBySectionImageToolBoxAction(this,parent);
 

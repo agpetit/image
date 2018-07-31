@@ -3,15 +3,14 @@
 
 #include "zonegeneratorimagetoolboxaction.h"
 
-#include <sofa/component/component.h>
 #include <sofa/core/DataEngine.h>
 #include <sofa/core/objectmodel/BaseObject.h>
 #include <sofa/defaulttype/VecTypes.h>
-#include "ImageTypes.h"
+#include <image/ImageTypes.h>
 
 #include "../labelimagetoolbox.h"
 
-#include "initImage_gui.h"
+#include <image/image_gui/config.h>
 
 namespace sofa
 {
@@ -60,7 +59,7 @@ public:
     
     }
     
-    virtual void init()
+    virtual void init() override
     {/*
         d_ip.setGroup("PixelClicked");
         d_p.setGroup("PixelClicked");
@@ -71,7 +70,7 @@ public:
         addOutput(&d_vecPixCoord);*/
     }
     
-    virtual sofa::gui::qt::LabelImageToolBoxAction* createTBAction(QWidget*parent=NULL)
+    virtual sofa::gui::qt::LabelImageToolBoxAction* createTBAction(QWidget*parent=NULL) override
     {
         return new sofa::gui::qt::ZoneGeneratorImageToolBoxAction(this,parent);
     }
@@ -86,8 +85,8 @@ public:
     Data<Vec3d> d_p;
     Data<unsigned int> d_axis;
     Data<std::string> d_value;
-    Data<VecCoord> d_vecCoord;
-    Data<VecPixCoord> d_vecPixCoord;
+    Data<VecCoord> d_vecCoord; ///< Output list of space position of each pixel on contour
+    Data<VecPixCoord> d_vecPixCoord; ///< Output list of image position of each pixel on contour
 
     Data<double> threshold;
     Data<int> radius;
@@ -124,7 +123,7 @@ public:
         ListVec2i last;
     };
 
-    T color(int index,int max)
+    T color(int index,int /*max*/)
     {
         return index;
     }
@@ -141,7 +140,7 @@ public:
     
     }
     
-    virtual void init()
+    virtual void init() override
     {
         Inherited::init();
         addInput(&d_image);
@@ -163,7 +162,7 @@ public:
         return (float)rand()/(float)RAND_MAX;
     }
 
-    virtual void generate()
+    virtual void generate() override
     {
 
         //std::cout << "generate"<<std::endl;
@@ -178,10 +177,10 @@ public:
 
         const unsigned int dimX = im_in->getCImg().width();
         const unsigned int dimY = im_in->getCImg().height();
-        const unsigned int dimZ = im_in->getCImg().depth();
+//        const unsigned int dimZ = im_in->getCImg().depth();
         const unsigned int dimS = im_in->getCImg().spectrum();
 
-        const unsigned int nbPixels = dimX*dimY;
+//        const unsigned int nbPixels = dimX*dimY;
 
 
 
@@ -297,7 +296,7 @@ public:
         for(unsigned int j=0;j<dimY;j++)
         {
             T* pColor = new T[dimS];// = {0};//(unsigned short)(((float)i/(float)dimX)*(float)USHRT_MAX)};
-            for(int c=0;c<dimS;c++)pColor[c]=color(0,1);
+            for(int c=0;c<(int)dimS;c++)pColor[c]=color(0,1);
             //std::cout <<pColor[0]<<std::endl;
 
             im_out->getCImg().draw_point(i, j, 0, pColor);
@@ -343,7 +342,7 @@ public:
             delete [] pColor;
         }
 
-        unsigned int probcount = sizemax+sizemax/2;
+//        unsigned int probcount = sizemax+sizemax/2;
 
         int kk=sizemax;
         vector< unsigned int> test;
@@ -409,7 +408,7 @@ public:
                     }
                 }
 
-                if(v.x()<dimX-1)
+                if(v.x()<(int)(dimX-1))
                 {
                     if(im_out->getCImg()(v.x()+1,v.y(),0,0)==0)
                     {
@@ -425,7 +424,7 @@ public:
                     }
                 }
 
-                if(v.y()<dimY-1)
+                if(v.y()<(int)(dimY-1))
                 {
                     if(im_out->getCImg()(v.x(),v.y()+1,0,0)==0)
                     {
@@ -803,9 +802,9 @@ public:
     }*/
 
 protected:
-    Data< ImageTypes >   d_image;
+    Data< ImageTypes >   d_image; ///< Input image
 //    Data< TransformType> d_transform;
-    Data< ImageTypes >   d_imageOut;
+    Data< ImageTypes >   d_imageOut; ///< OutputImage
 
     Data< Vec2d > d_size;
     Data< unsigned int > d_seed;

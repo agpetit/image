@@ -1,7 +1,12 @@
 #ifndef IMAGETOOLBOXBASICACTIONWIDGET_H
 #define IMAGETOOLBOXBASICACTIONWIDGET_H
 
-#include <QtGui>
+#include <image/image_gui/config.h>
+
+#include <QAction>
+#include <QMessageBox>
+#include <QToolBar>
+
 #include "imagetoolboxcentralwidget.h"
 
 namespace sofa

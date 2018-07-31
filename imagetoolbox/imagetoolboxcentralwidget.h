@@ -2,53 +2,39 @@
 #define IMAGETOOLBOXCENTRALWIDGET_H
 
 /******************************************************************************
-*       SOFA, Simulation Open-Framework Architecture, version 1.0 beta 4      *
-*                (c) 2006-2009 MGH, INRIA, USTL, UJF, CNRS                    *
+*       SOFA, Simulation Open-Framework Architecture, development version     *
+*                (c) 2006-2018 INRIA, USTL, UJF, CNRS, MGH                    *
 *                                                                             *
-* This library is free software; you can redistribute it and/or modify it     *
+* This program is free software; you can redistribute it and/or modify it     *
 * under the terms of the GNU Lesser General Public License as published by    *
 * the Free Software Foundation; either version 2.1 of the License, or (at     *
 * your option) any later version.                                             *
 *                                                                             *
-* This library is distributed in the hope that it will be useful, but WITHOUT *
+* This program is distributed in the hope that it will be useful, but WITHOUT *
 * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or       *
 * FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License *
 * for more details.                                                           *
 *                                                                             *
 * You should have received a copy of the GNU Lesser General Public License    *
-* along with this library; if not, write to the Free Software Foundation,     *
-* Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA.          *
+* along with this program. If not, see <http://www.gnu.org/licenses/>.        *
 *******************************************************************************
-*                               SOFA :: Modules                               *
-*                                                                             *
 * Authors: The SOFA Team and external contributors (see Authors.txt)          *
 *                                                                             *
 * Contact information: contact@sofa-framework.org                             *
 ******************************************************************************/
 
-#include "initImage_gui.h"
+#include <image/image_gui/config.h>
 #include <sofa/gui/qt/DataWidget.h>
 #include <sofa/gui/qt/SimpleDataWidget.h>
 
-#ifdef SOFA_QT4
 #include <QLabel>
 #include <QImage>
 #include <QSlider>
 #include <QString>
 #include <QGraphicsView>
 #include <QGraphicsScene>
-#include <QtGui>
-#else
-#include <qlabel.h>
-#include <qimage.h>
-#include <qslider.h>
-#include <qstring.h>
-#include <qgraphicsView.h>
-#include <qgraphicsscene.h>
-#include <qtgui.h>
-#endif
 
-#include "ImageTypes.h"
+#include <image/ImageTypes.h>
 #include "imagetoolboxdata.h"
 #include "../image_gui/ImagePlaneWidget.h"
 
@@ -104,8 +90,8 @@ public:
         layout->setMargin(0);
         layout->setSpacing(10);
         //layout->add(toggle);
-        layout->add(slider);
-        layout->add(label);
+        layout->addWidget(slider);
+        layout->addWidget(label);
 
         this->setFixedHeight ( height );
     }
@@ -345,7 +331,7 @@ public:
     }
     
     
-       void setReadOnly(bool readOnly) { }
+       void setReadOnly(bool /*readOnly*/) { }
     void readFromData(const ImagePlanetype& d0) {  if(graphXY) graphXY->readFromData(d0); if(graphXZ) graphXZ->readFromData(d0); if(graphZY) graphZY->readFromData(d0);}
     void writeToData(ImagePlanetype& d) { if(graphXY) graphXY->writeToData(d); if(graphXZ) graphXZ->writeToData(d); if(graphZY) graphZY->writeToData(d);}
 
@@ -367,7 +353,7 @@ public:
 
         //if(graphXY && graphXZ && graphZY) layout->addWidget(info,2,1);
         //else
-        if(info)container_layout->add(info);
+        if(info)container_layout->addWidget(info);
 
     }
 

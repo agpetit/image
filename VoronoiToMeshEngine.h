@@ -1,23 +1,20 @@
 /******************************************************************************
-*       SOFA, Simulation Open-Framework Architecture, version 1.0 beta 4      *
-*                (c) 2006-2009 MGH, INRIA, USTL, UJF, CNRS                    *
+*       SOFA, Simulation Open-Framework Architecture, development version     *
+*                (c) 2006-2018 INRIA, USTL, UJF, CNRS, MGH                    *
 *                                                                             *
-* This library is free software; you can redistribute it and/or modify it     *
+* This program is free software; you can redistribute it and/or modify it     *
 * under the terms of the GNU Lesser General Public License as published by    *
 * the Free Software Foundation; either version 2.1 of the License, or (at     *
 * your option) any later version.                                             *
 *                                                                             *
-* This library is distributed in the hope that it will be useful, but WITHOUT *
+* This program is distributed in the hope that it will be useful, but WITHOUT *
 * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or       *
 * FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License *
 * for more details.                                                           *
 *                                                                             *
 * You should have received a copy of the GNU Lesser General Public License    *
-* along with this library; if not, write to the Free Software Foundation,     *
-* Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA.          *
+* along with this program. If not, see <http://www.gnu.org/licenses/>.        *
 *******************************************************************************
-*                               SOFA :: Modules                               *
-*                                                                             *
 * Authors: The SOFA Team and external contributors (see Authors.txt)          *
 *                                                                             *
 * Contact information: contact@sofa-framework.org                             *
@@ -25,16 +22,15 @@
 #ifndef SOFA_IMAGE_VoronoiToMeshENGINE_H
 #define SOFA_IMAGE_VoronoiToMeshENGINE_H
 
-#include "initImage.h"
+#include <image/config.h>
 #include "ImageTypes.h"
 #include <sofa/core/DataEngine.h>
-#include <sofa/component/component.h>
 #include <sofa/core/objectmodel/BaseObject.h>
 #include <sofa/core/topology/BaseMeshTopology.h>
 #include <sofa/core/visual/VisualParams.h>
 
 #include <sofa/core/objectmodel/Event.h>
-#include <sofa/simulation/common/AnimateEndEvent.h>
+#include <sofa/simulation/AnimateEndEvent.h>
 
 #include <sofa/defaulttype/Vec.h>
 
@@ -47,11 +43,6 @@ namespace component
 namespace engine
 {
 
-using helper::vector;
-using defaulttype::Vec;
-using defaulttype::Mat;
-using cimg_library::CImg;
-using cimg_library::CImgList;
 
 /**
  * This class generates flat faces between adjacent regions of an image
@@ -67,39 +58,39 @@ public:
 
     typedef SReal Real;
 
-    Data< bool > showMesh;
+    Data< bool > showMesh; ///< show reconstructed mesh
 
     typedef _ImageTypes ImageTypes;
     typedef typename ImageTypes::T T;
     typedef typename ImageTypes::imCoord imCoord;
     typedef helper::ReadAccessor<Data< ImageTypes > > raImage;
-    Data< ImageTypes > image;
-    Data< ImageTypes > background;
+    Data< ImageTypes > image; ///< Voronoi image
+    Data< ImageTypes > background; ///< Optional Voronoi image of the background to surface details
 
     typedef defaulttype::ImageLPTransform<Real> TransformType;
     typedef typename TransformType::Coord Coord;
     typedef helper::ReadAccessor<Data< TransformType > > raTransform;
     Data< TransformType > transform;
 
-    typedef vector<Coord > SeqPositions;
+    typedef helper::vector<Coord > SeqPositions;
     typedef helper::ReadAccessor<Data< SeqPositions > > raPositions;
-    typedef helper::WriteAccessor<Data< SeqPositions > > waPositions;
-    Data< SeqPositions > position;
+    typedef helper::WriteOnlyAccessor<Data< SeqPositions > > waPositions;
+    Data< SeqPositions > position; ///< output positions
 
     typedef typename core::topology::BaseMeshTopology::Edge Edge;
     typedef typename core::topology::BaseMeshTopology::SeqEdges SeqEdges;
     typedef helper::ReadAccessor<Data< SeqEdges > > raEdges;
-    typedef helper::WriteAccessor<Data< SeqEdges > > waEdges;
-    Data< SeqEdges > edges;
+    typedef helper::WriteOnlyAccessor<Data< SeqEdges > > waEdges;
+    Data< SeqEdges > edges; ///< output edges
 
     typedef typename core::topology::BaseMeshTopology::Triangle Triangle;
     typedef typename core::topology::BaseMeshTopology::SeqTriangles SeqTriangles;
-    typedef helper::WriteAccessor<Data< SeqTriangles > > waTriangles;
-    Data< SeqTriangles > triangles;
+    typedef helper::WriteOnlyAccessor<Data< SeqTriangles > > waTriangles;
+    Data< SeqTriangles > triangles; ///< output triangles
 
-    Data< Real > minLength;
+    Data< Real > minLength; ///< minimun edge length in pixels
 
-    virtual std::string getTemplateName() const    { return templateName(this);    }
+    virtual std::string getTemplateName() const    override { return templateName(this);    }
     static std::string templateName(const VoronoiToMeshEngine<ImageTypes>* = NULL) { return ImageTypes::Name();    }
 
     VoronoiToMeshEngine()    :   Inherited()
@@ -118,7 +109,7 @@ public:
         f_listening.setValue(true);
     }
 
-    virtual void init()
+    virtual void init() override
     {
         addInput(&image);
         addInput(&background);
@@ -130,7 +121,7 @@ public:
         setDirtyValue();
     }
 
-    virtual void reinit() { update(); }
+    virtual void reinit() override { update(); }
 
 protected:
 
@@ -237,16 +228,14 @@ protected:
     }
 
 
-    virtual void update()
+    virtual void update() override
     {
         raImage in(this->image);
         raImage inb(this->background);
         raTransform inT(this->transform);
 
-        cleanDirty();
-
         // get image at time t
-        CImg<T> img = in->getCImg(this->time);
+        cimg_library::CImg<T> img = in->getCImg(this->time);
 
         T mx = img.max()+1;
 
@@ -262,14 +251,14 @@ protected:
         }
         else        // use voronoi of the background to add surface details
         {
-            CImg<T> bkg = inb->getCImg(this->time);
+            cimg_library::CImg<T> bkg = inb->getCImg(this->time);
             cimg_forXYZ(img,x,y,z)
                     if(img(x,y,z)==0)
                         img(x,y,z)=mx+bkg(x,y,z)-1;
         }
 
         // identify special voxel corners (with more than three neighboring regions)
-        CImg<unsigned int> UIimg(img.width(),img.height(),img.depth());
+        cimg_library::CImg<unsigned int> UIimg(img.width(),img.height(),img.depth());
         UIimg.fill(0);
 
         IDtoInd regions;
@@ -398,11 +387,12 @@ protected:
         }
 
         if(this->f_printLog.getValue()) std::cout<<this->name<<": done"<<std::endl;
+        cleanDirty();
     }
 
-    void handleEvent(sofa::core::objectmodel::Event *event)
+    void handleEvent(sofa::core::objectmodel::Event *event) override
     {
-        if ( dynamic_cast<simulation::AnimateEndEvent*>(event))
+        if (simulation::AnimateEndEvent::checkEventType(event))
         {
             raImage in(this->image);
             raTransform inT(this->transform);
@@ -419,7 +409,7 @@ protected:
         }
     }
 
-    virtual void draw(const core::visual::VisualParams* vparams)
+    virtual void draw(const core::visual::VisualParams* vparams) override
     {
 #ifndef SOFA_NO_OPENGL
 

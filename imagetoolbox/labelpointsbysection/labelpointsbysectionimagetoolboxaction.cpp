@@ -1,12 +1,14 @@
 
 
+#include "labelpointsbysectionimagetoolbox.h"
+
 #include <QString>
-#include <QtGui>
 #include <QPointF>
+#include <QGroupBox>
+#include <QMessageBox>
 
 #include "labelpointsbysectionimagetoolboxaction.h"
 
-#include "labelpointsbysectionimagetoolbox.h"
 #include <sofa/helper/rmath.h>
 
 
@@ -18,7 +20,7 @@ namespace qt
 {
 
 LabelPointsBySectionImageToolBoxAction::LabelPointsBySectionImageToolBoxAction(sofa::component::engine::LabelImageToolBox* lba,QObject *parent):
-    LabelImageToolBoxAction(lba,parent),addPoints(false),tablewidget(NULL)
+    LabelImageToolBoxAction(lba,parent),tablewidget(NULL),addPoints(false)
 {
 
 

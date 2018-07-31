@@ -1,23 +1,20 @@
 /******************************************************************************
-*       SOFA, Simulation Open-Framework Architecture, version 1.0 beta 4      *
-*                (c) 2006-2009 MGH, INRIA, USTL, UJF, CNRS                    *
+*       SOFA, Simulation Open-Framework Architecture, development version     *
+*                (c) 2006-2018 INRIA, USTL, UJF, CNRS, MGH                    *
 *                                                                             *
-* This library is free software; you can redistribute it and/or modify it     *
+* This program is free software; you can redistribute it and/or modify it     *
 * under the terms of the GNU Lesser General Public License as published by    *
 * the Free Software Foundation; either version 2.1 of the License, or (at     *
 * your option) any later version.                                             *
 *                                                                             *
-* This library is distributed in the hope that it will be useful, but WITHOUT *
+* This program is distributed in the hope that it will be useful, but WITHOUT *
 * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or       *
 * FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License *
 * for more details.                                                           *
 *                                                                             *
 * You should have received a copy of the GNU Lesser General Public License    *
-* along with this library; if not, write to the Free Software Foundation,     *
-* Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA.          *
+* along with this program. If not, see <http://www.gnu.org/licenses/>.        *
 *******************************************************************************
-*                               SOFA :: Modules                               *
-*                                                                             *
 * Authors: The SOFA Team and external contributors (see Authors.txt)          *
 *                                                                             *
 * Contact information: contact@sofa-framework.org                             *
@@ -179,7 +176,7 @@ void ImageLPTransformWidget<TransformType>::readFromData()
     scale[2]->setValue(ra->getScale()[2]);
     offsetT->setValue(ra->getOffsetT());
     scaleT->setValue(ra->getScaleT());
-    isPerspective->setChecked(ra->isPerspective());
+    isPerspective->setChecked(ra->isPerspective()!=0);
 
     this->setWidgetDirty(false);
 }
@@ -187,7 +184,7 @@ void ImageLPTransformWidget<TransformType>::readFromData()
 template<class TransformType>
 void ImageLPTransformWidget<TransformType>::writeToData()
 {
-    helper::WriteAccessor<MyTData> wa (this->getData());
+    helper::WriteOnlyAccessor<MyTData> wa (this->getData());
 
     wa->getTranslation()[0]=translation[0]->getValue();
     wa->getTranslation()[1]=translation[1]->getValue();
@@ -200,7 +197,7 @@ void ImageLPTransformWidget<TransformType>::writeToData()
     wa->getScale()[2]=scale[2]->getValue();
     wa->getOffsetT()=offsetT->getValue();
     wa->getScaleT()=scaleT->getValue();
-    wa->isPerspective()=isPerspective->isChecked();
+    wa->isPerspective()=(int)isPerspective->isChecked();
     wa->update();
 }
 

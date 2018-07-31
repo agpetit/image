@@ -1,16 +1,18 @@
 #ifndef CONTOURIMAGETOOLBOXACTION_H
 #define CONTOURIMAGETOOLBOXACTION_H
 
-#include <QtGui>
-#include <QAction>
-#include <QGraphicsLineItem>
+#include <image/image_gui/config.h>
 
+#include <QPushButton>
+#include <QSpinBox>
+#include <QAction>
+#include <QGroupBox>
+
+#include <QGraphicsLineItem>
 
 #include <sofa/defaulttype/VecTypes.h>
 #include "../labelimagetoolboxaction.h"
 //#include "contourimagetoolbox.h"
-
-#include "initImage_gui.h"
 
 namespace sofa
 {

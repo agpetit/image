@@ -1,23 +1,20 @@
 /******************************************************************************
-*       SOFA, Simulation Open-Framework Architecture, version 1.0 beta 4      *
-*                (c) 2006-2009 MGH, INRIA, USTL, UJF, CNRS                    *
+*       SOFA, Simulation Open-Framework Architecture, development version     *
+*                (c) 2006-2018 INRIA, USTL, UJF, CNRS, MGH                    *
 *                                                                             *
-* This library is free software; you can redistribute it and/or modify it     *
+* This program is free software; you can redistribute it and/or modify it     *
 * under the terms of the GNU Lesser General Public License as published by    *
 * the Free Software Foundation; either version 2.1 of the License, or (at     *
 * your option) any later version.                                             *
 *                                                                             *
-* This library is distributed in the hope that it will be useful, but WITHOUT *
+* This program is distributed in the hope that it will be useful, but WITHOUT *
 * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or       *
 * FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License *
 * for more details.                                                           *
 *                                                                             *
 * You should have received a copy of the GNU Lesser General Public License    *
-* along with this library; if not, write to the Free Software Foundation,     *
-* Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA.          *
+* along with this program. If not, see <http://www.gnu.org/licenses/>.        *
 *******************************************************************************
-*                               SOFA :: Modules                               *
-*                                                                             *
 * Authors: The SOFA Team and external contributors (see Authors.txt)          *
 *                                                                             *
 * Contact information: contact@sofa-framework.org                             *
@@ -25,16 +22,15 @@
 #ifndef SOFA_IMAGE_MARCHINGCUBESENGINE_H
 #define SOFA_IMAGE_MARCHINGCUBESENGINE_H
 
-#include "initImage.h"
+#include <image/config.h>
 #include "ImageTypes.h"
 #include <sofa/core/DataEngine.h>
-#include <sofa/component/component.h>
 #include <sofa/core/objectmodel/BaseObject.h>
 #include <sofa/core/topology/BaseMeshTopology.h>
 #include <sofa/core/visual/VisualParams.h>
 
 #include <sofa/core/objectmodel/Event.h>
-#include <sofa/simulation/common/AnimateEndEvent.h>
+#include <sofa/simulation/AnimateEndEvent.h>
 
 #include <sofa/defaulttype/Vec.h>
 #include <sofa/helper/gl/Texture.h>
@@ -47,12 +43,6 @@ namespace component
 
 namespace engine
 {
-
-using helper::vector;
-using defaulttype::Vec;
-using defaulttype::Mat;
-using cimg_library::CImg;
-using cimg_library::CImgList;
 
 /**
  * This class computes an isosurface from an image using marching cubes algorithm
@@ -68,9 +58,10 @@ public:
 
     typedef SReal Real;
 
-    Data< Real > isoValue;
-    Data< Vec<3,unsigned int> > subdiv;
-    Data< bool > showMesh;
+    Data< Real > isoValue; ///< pixel value to extract isosurface
+    Data< defaulttype::Vec<3,unsigned int> > subdiv; ///< number of subdividions in x,y,z directions (use image dimension if =0)
+    Data< bool > invertNormals; ///< invert triangle vertex order
+    Data< bool > showMesh; ///< show reconstructed mesh
 
     typedef _ImageTypes ImageTypes;
     typedef typename ImageTypes::T T;
@@ -83,23 +74,24 @@ public:
     typedef helper::ReadAccessor<Data< TransformType > > raTransform;
     Data< TransformType > transform;
 
-    typedef vector<Vec<3,Real> > SeqPositions;
+    typedef helper::vector<defaulttype::Vec<3,Real> > SeqPositions;
     typedef helper::ReadAccessor<Data< SeqPositions > > raPositions;
-    typedef helper::WriteAccessor<Data< SeqPositions > > waPositions;
-    Data< SeqPositions > position;
+    typedef helper::WriteOnlyAccessor<Data< SeqPositions > > waPositions;
+    Data< SeqPositions > position; ///< output positions
 
     typedef typename core::topology::BaseMeshTopology::Triangle Triangle;
     typedef typename core::topology::BaseMeshTopology::SeqTriangles SeqTriangles;
     typedef helper::ReadAccessor<Data< SeqTriangles > > raTriangles;
-    typedef helper::WriteAccessor<Data< SeqTriangles > > waTriangles;
-    Data< SeqTriangles > triangles;
+    typedef helper::WriteOnlyAccessor<Data< SeqTriangles > > waTriangles;
+    Data< SeqTriangles > triangles; ///< output triangles
 
-    virtual std::string getTemplateName() const    { return templateName(this);    }
+    virtual std::string getTemplateName() const    override { return templateName(this);    }
     static std::string templateName(const MarchingCubesEngine<ImageTypes>* = NULL) { return ImageTypes::Name();    }
 
     MarchingCubesEngine()    :   Inherited()
         , isoValue(initData(&isoValue,(Real)(1.0),"isoValue","pixel value to extract isosurface"))
-        , subdiv(initData(&subdiv,Vec<3,unsigned int>(0,0,0),"subdiv","number of subdividions in x,y,z directions (use image dimension if =0)"))
+        , subdiv(initData(&subdiv,defaulttype::Vec<3,unsigned int>(0,0,0),"subdiv","number of subdividions in x,y,z directions (use image dimension if =0)"))
+        , invertNormals(initData(&invertNormals,true,"invertNormals","invert triangle vertex order"))
         , showMesh(initData(&showMesh,false,"showMesh","show reconstructed mesh"))
         , image(initData(&image,ImageTypes(),"image",""))
         , transform(initData(&transform,TransformType(),"transform",""))
@@ -112,7 +104,7 @@ public:
         f_listening.setValue(true);
     }
 
-    virtual void init()
+    virtual void init() override
     {
         addInput(&image);
         addInput(&transform);
@@ -121,34 +113,30 @@ public:
         setDirtyValue();
     }
 
-    virtual void reinit() { update(); }
+    virtual void reinit() override { update(); }
 
 protected:
 
     unsigned int time;
 
-    virtual void update()
+    virtual void update() override
     {
-        cleanDirty();
-
         raImage in(this->image);
-        raTransform inT(this->transform);
+		raTransform inT(this->transform);
 
         // get image at time t
-        const CImg<T>& img = in->getCImg(this->time);
-        CImg<T> img1=img;
-        if(img.spectrum()!=1) img1.resize(img1.width(),img1.height(),img1.depth(),1,0);
+        const cimg_library::CImg<T>& img = in->getCImg(this->time);
 
         // get subdivision
-        Vec<3,int> r((int)this->subdiv.getValue()[0],(int)this->subdiv.getValue()[1],(int)this->subdiv.getValue()[2]);
+        defaulttype::Vec<3,int> r((int)this->subdiv.getValue()[0],(int)this->subdiv.getValue()[1],(int)this->subdiv.getValue()[2]);
         for(unsigned int i=0; i<3; i++) if(!r[i]) r[i]=-100;
 
         // get isovalue
         const float val=(float)this->isoValue.getValue();
 
         // marching cubes using cimg
-        CImgList<unsigned int> faces;
-        CImg<float> points = img1.get_isosurface3d (faces, val,r[0],r[1],r[2]);
+        cimg_library::CImgList<unsigned int> faces;
+        cimg_library::CImg<float> points = img.get_shared_channel(0).get_isosurface3d (faces, val,r[0],r[1],r[2]);
 
         // update points and faces
         waPositions pos(this->position);
@@ -157,12 +145,17 @@ protected:
 
         waTriangles tri(this->triangles);
         tri.resize(faces.size());
-        cimglist_for(faces,l) tri[l]=Triangle(faces(l,0),faces(l,1),faces(l,2));
+        if( invertNormals.getValue() )
+            cimglist_for(faces,l) tri[l]=Triangle(faces(l,2),faces(l,1),faces(l,0));
+        else
+            cimglist_for(faces,l) tri[l]=Triangle(faces(l,0),faces(l,1),faces(l,2));
+
+        cleanDirty();
     }
 
-    void handleEvent(sofa::core::objectmodel::Event *event)
+    void handleEvent(sofa::core::objectmodel::Event *event) override
     {
-        if ( dynamic_cast<simulation::AnimateEndEvent*>(event))
+        if (simulation::AnimateEndEvent::checkEventType(event))
         {
             raImage in(this->image);
             raTransform inT(this->transform);
@@ -179,7 +172,7 @@ protected:
         }
     }
 
-    virtual void draw(const core::visual::VisualParams* vparams)
+    virtual void draw(const core::visual::VisualParams* vparams) override
     {
 #ifndef SOFA_NO_OPENGL
         if (!vparams->displayFlags().getShowVisualModels()) return;
@@ -206,10 +199,10 @@ protected:
         for (unsigned int i=0; i<tri.size(); ++i)
         {
             if(wireframe) glBegin(GL_LINE_LOOP);
-            const Vec<3,Real>& a = pos[ tri[i][0] ];
-            const Vec<3,Real>& b = pos[ tri[i][1] ];
-            const Vec<3,Real>& c = pos[ tri[i][2] ];
-            Vec<3,Real> n = cross((a-b),(a-c));	n.normalize();
+            const defaulttype::Vec<3,Real>& a = pos[ tri[i][0] ];
+            const defaulttype::Vec<3,Real>& b = pos[ tri[i][1] ];
+            const defaulttype::Vec<3,Real>& c = pos[ tri[i][2] ];
+            defaulttype::Vec<3,Real> n = cross((a-b),(a-c));	n.normalize();
             glNormal3d(n[0],n[1],n[2]);
 
 

@@ -1,23 +1,20 @@
 /******************************************************************************
-*       SOFA, Simulation Open-Framework Architecture, version 1.0 beta 4      *
-*                (c) 2006-2009 MGH, INRIA, USTL, UJF, CNRS                    *
+*       SOFA, Simulation Open-Framework Architecture, development version     *
+*                (c) 2006-2018 INRIA, USTL, UJF, CNRS, MGH                    *
 *                                                                             *
-* This library is free software; you can redistribute it and/or modify it     *
+* This program is free software; you can redistribute it and/or modify it     *
 * under the terms of the GNU Lesser General Public License as published by    *
 * the Free Software Foundation; either version 2.1 of the License, or (at     *
 * your option) any later version.                                             *
 *                                                                             *
-* This library is distributed in the hope that it will be useful, but WITHOUT *
+* This program is distributed in the hope that it will be useful, but WITHOUT *
 * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or       *
 * FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License *
 * for more details.                                                           *
 *                                                                             *
 * You should have received a copy of the GNU Lesser General Public License    *
-* along with this library; if not, write to the Free Software Foundation,     *
-* Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA.          *
+* along with this program. If not, see <http://www.gnu.org/licenses/>.        *
 *******************************************************************************
-*                               SOFA :: Modules                               *
-*                                                                             *
 * Authors: The SOFA Team and external contributors (see Authors.txt)          *
 *                                                                             *
 * Contact information: contact@sofa-framework.org                             *
@@ -25,13 +22,12 @@
 #ifndef SOFA_IMAGE_IMAGETRANSFORM_H
 #define SOFA_IMAGE_IMAGETRANSFORM_H
 
-#include "initImage.h"
+#include <image/config.h>
 #include "ImageTypes.h"
 #include <sofa/core/DataEngine.h>
 #include <sofa/core/objectmodel/BaseObject.h>
 #include <sofa/defaulttype/Vec.h>
 
-#include <sofa/component/component.h>
 #include <sofa/helper/OptionsGroup.h>
 
 #include "ImageContainer.h"
@@ -61,14 +57,14 @@ public:
     typedef sofa::defaulttype::Vec<3,Real> Vec3;
     typedef defaulttype::ImageLPTransform<Real> TransformType;
     typedef helper::ReadAccessor<Data< TransformType > > raTransform;
-    typedef helper::WriteAccessor<Data< TransformType > > waTransform;
+    typedef helper::WriteOnlyAccessor<Data< TransformType > > waTransform;
     typedef sofa::component::container::ImageContainer<ImageTypes> ImageContainer;
 
     ImageTransform()    :   Inherited()
         ,_translation(initData(&_translation, Vec3(),"translation","Translation"))
         ,_euler(initData(&_euler, Vec3(),"euler","Euler angles"))
         ,_scale(initData(&_scale, Vec3(1,1,1),"scale","Voxel size"))
-        ,_isPerspective(initData(&_isPerspective, true,"isPerspective","Is perspective?"))
+        ,_isPerspective(initData(&_isPerspective, 0,"isPerspective","Is perspective?"))
         ,_timeOffset(initData(&_timeOffset, (Real)0,"timeOffset","Time offset"))
         ,_timeScale(initData(&_timeScale, (Real)1,"timeScale","Time scale"))
         ,_update(initData(&_update, "update","Type of update"))
@@ -88,7 +84,7 @@ public:
 
     ~ImageTransform() {}
 
-    void init()
+    void init() override
     {
         container = this->getContext()->template get<ImageContainer>(core::objectmodel::BaseContext::SearchUp);
         if (!container)
@@ -97,26 +93,26 @@ public:
         reinit();
     }
 
-    void reinit()
+    void reinit() override
     {
         update();
     }
 
-    Data<Vec3> _translation;
-    Data<Vec3> _euler;
-    Data<Vec3> _scale;
-    Data<bool> _isPerspective;
-    Data<Real> _timeOffset;
-    Data<Real> _timeScale;
+    Data<Vec3> _translation; ///< Translation
+    Data<Vec3> _euler; ///< Euler angles
+    Data<Vec3> _scale; ///< Voxel size
+    Data<int> _isPerspective; ///< Is perspective?
+    Data<Real> _timeOffset; ///< Time offset
+    Data<Real> _timeScale; ///< Time scale
 
     enum UPDATE_TYPE{NO_UPDATE = 0, EVERY_TIMESTEP, EVERY_DRAW};
-    Data<sofa::helper::OptionsGroup> _update;
+    Data<sofa::helper::OptionsGroup> _update; ///< Type of update
 
 protected:
 
     ImageContainer* container;
 
-    virtual void update()
+    virtual void update() override
     {
         if (!container) return;
 
@@ -124,26 +120,26 @@ protected:
         if (!_translation.isSet()) _translation.setValue(wTransform->getTranslation()); else wTransform->getTranslation()=_translation.getValue();
         if (!_euler.isSet()) _euler.setValue(wTransform->getRotation()); else wTransform->getRotation()=_euler.getValue();
         if (!_scale.isSet()) _scale.setValue(wTransform->getScale()); else wTransform->getScale()=_scale.getValue();
-        if (!_isPerspective.isSet()) _isPerspective.setValue(wTransform->isPerspective()!=0); else wTransform->isPerspective()=_isPerspective.getValue();
+        if (!_isPerspective.isSet()) _isPerspective.setValue(wTransform->isPerspective()); else wTransform->isPerspective()=_isPerspective.getValue();
         if (!_timeOffset.isSet()) _timeOffset.setValue(wTransform->getOffsetT()); else wTransform->getOffsetT()=_timeOffset.getValue();
         if (!_timeScale.isSet()) _timeScale.setValue(wTransform->getScaleT()); else wTransform->getScaleT()=_timeScale.getValue();
     }
 
 public:
 
-    virtual void draw(const core::visual::VisualParams*)
+    virtual void draw(const core::visual::VisualParams*) override
     {
         if (_update.getValue().getSelectedId()==EVERY_DRAW)
             update();
     }
 
-    void handleEvent(core::objectmodel::Event *event)
+    void handleEvent(core::objectmodel::Event *event) override
     {
-        if (dynamic_cast<sofa::simulation::AnimateBeginEvent *>(event) && _update.getValue().getSelectedId()==EVERY_TIMESTEP)
+        if (sofa::simulation::AnimateBeginEvent::checkEventType(event) && _update.getValue().getSelectedId()==EVERY_TIMESTEP)
             update();
     }
 
-    virtual std::string getTemplateName() const    { return templateName(this);    }
+    virtual std::string getTemplateName() const    override { return templateName(this);    }
     static std::string templateName(const ImageTransform<ImageTypes>* = NULL) { return ImageTypes::Name(); }
 
 };

@@ -1,23 +1,20 @@
 /******************************************************************************
-*       SOFA, Simulation Open-Framework Architecture, version 1.0 beta 4      *
-*                (c) 2006-2009 MGH, INRIA, USTL, UJF, CNRS                    *
+*       SOFA, Simulation Open-Framework Architecture, development version     *
+*                (c) 2006-2018 INRIA, USTL, UJF, CNRS, MGH                    *
 *                                                                             *
-* This library is free software; you can redistribute it and/or modify it     *
+* This program is free software; you can redistribute it and/or modify it     *
 * under the terms of the GNU Lesser General Public License as published by    *
 * the Free Software Foundation; either version 2.1 of the License, or (at     *
 * your option) any later version.                                             *
 *                                                                             *
-* This library is distributed in the hope that it will be useful, but WITHOUT *
+* This program is distributed in the hope that it will be useful, but WITHOUT *
 * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or       *
 * FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License *
 * for more details.                                                           *
 *                                                                             *
 * You should have received a copy of the GNU Lesser General Public License    *
-* along with this library; if not, write to the Free Software Foundation,     *
-* Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA.          *
+* along with this program. If not, see <http://www.gnu.org/licenses/>.        *
 *******************************************************************************
-*                               SOFA :: Modules                               *
-*                                                                             *
 * Authors: The SOFA Team and external contributors (see Authors.txt)          *
 *                                                                             *
 * Contact information: contact@sofa-framework.org                             *
@@ -25,15 +22,13 @@
 #ifndef SOFA_IMAGE_IMAGEFILTER_H
 #define SOFA_IMAGE_IMAGEFILTER_H
 
-#include "initImage.h"
+#include <image/config.h>
 #include "ImageTypes.h"
 #include <sofa/core/DataEngine.h>
 #include <sofa/core/objectmodel/BaseObject.h>
 #include <sofa/defaulttype/Vec.h>
 #include <sofa/helper/rmath.h>
 #include <sofa/helper/OptionsGroup.h>
-
-#include <sofa/component/component.h>
 
 #define NONE 0
 #define BLURDERICHE 1
@@ -62,6 +57,9 @@
 #define FILLHOLES 24
 #define CONNECTEDCOMPONENTS 25
 #define LARGESTCONNECTEDCOMPONENT 26
+#define MIRROR 27
+#define SHARPEN 28
+#define EXPAND 29
 
 
 namespace sofa
@@ -72,10 +70,6 @@ namespace component
 
 namespace engine
 {
-
-using helper::vector;
-using cimg_library::CImg;
-using cimg_library::CImgList;
 
 /**
  * This class computes a filtered image
@@ -92,27 +86,24 @@ public:
     typedef _InImageTypes InImageTypes;
     typedef typename InImageTypes::T Ti;
     typedef typename InImageTypes::imCoord imCoordi;
-    typedef helper::WriteAccessor<Data< InImageTypes > > waImagei;
     typedef helper::ReadAccessor<Data< InImageTypes > > raImagei;
 
     typedef _OutImageTypes OutImageTypes;
     typedef typename OutImageTypes::T To;
     typedef typename OutImageTypes::imCoord imCoordo;
-    typedef helper::WriteAccessor<Data< OutImageTypes > > waImageo;
-    typedef helper::ReadAccessor<Data< OutImageTypes > > raImageo;
+    typedef helper::WriteOnlyAccessor<Data< OutImageTypes > > waImageo;
 
     typedef SReal Real;
     typedef defaulttype::ImageLPTransform<Real> TransformType;
     typedef typename TransformType::Coord Coord;
-    typedef helper::WriteAccessor<Data< TransformType > > waTransform;
+    typedef helper::WriteOnlyAccessor<Data< TransformType > > waTransform;
     typedef helper::ReadAccessor<Data< TransformType > > raTransform;
 
-    typedef vector<double> ParamTypes;
-	typedef helper::WriteAccessor<Data< ParamTypes > > waParam;
-	typedef helper::ReadAccessor<Data< ParamTypes > > raParam;
+    typedef helper::vector<double> ParamTypes;
+    typedef helper::ReadAccessor<Data< ParamTypes > > raParam;
 
-    Data<helper::OptionsGroup> filter;
-    Data< ParamTypes > param;
+    Data<helper::OptionsGroup> filter; ///< Filter
+    Data< ParamTypes > param; ///< Parameters
 
     Data< InImageTypes > inputImage;
     Data< TransformType > inputTransform;
@@ -120,7 +111,7 @@ public:
     Data< OutImageTypes > outputImage;
     Data< TransformType > outputTransform;
 
-    virtual std::string getTemplateName() const    { return templateName(this);    }
+    virtual std::string getTemplateName() const    override { return templateName(this);    }
     static std::string templateName(const ImageFilter<InImageTypes,OutImageTypes>* = NULL) { return InImageTypes::Name()+std::string(",")+OutImageTypes::Name(); }
 
     ImageFilter()    :   Inherited()
@@ -135,7 +126,7 @@ public:
         inputTransform.setReadOnly(true);
         outputImage.setReadOnly(true);
         outputTransform.setReadOnly(true);
-        helper::OptionsGroup filterOptions(27	,"0 - None"
+        helper::OptionsGroup filterOptions(30	,"0 - None"
                                            ,"1 - Blur ( sigma )"
                                            ,"2 - Blur Median ( n )"
                                            ,"3 - Blur Bilateral ( sigma_s, sigma_r)"
@@ -162,6 +153,9 @@ public:
                                            ,"24 - Fill Holes (inval=0, outval=1)"
                                            ,"25 - Label connected components (tolerance=0)"
                                            ,"26 - Largest connected component (tolerance=0)"
+                                           ,"27 - Mirror (axis=0)"
+                                           ,"28 - Sharpen (sigma)"
+                                           ,"29 - Expand ( size )"
                                            );
         filterOptions.setSelectedItem(NONE);
         filter.setValue(filterOptions);
@@ -169,8 +163,8 @@ public:
 
     virtual ~ImageFilter() {}
 
-    virtual void init()
-    {
+    virtual void init() override
+	{
         addInput(&inputImage);
         addInput(&inputTransform);
         addOutput(&outputImage);
@@ -178,27 +172,29 @@ public:
         setDirtyValue();
     }
 
-    virtual void reinit() { update(); }
+    virtual void reinit() override { update(); }
 
 protected:
 
-    virtual void update()
+    virtual void update() override
     {
         bool updateImage = this->inputImage.isDirty();	// change of input image -> update output image
         bool updateTransform = this->inputTransform.isDirty();	// change of input transform -> update output transform
         if(!updateImage && !updateTransform) {updateImage=true; updateTransform=true;}  // change of parameters -> update all
 
-        cleanDirty();
         raParam p(this->param);
-        raImagei in(this->inputImage);
         raTransform inT(this->inputTransform);
+        raImagei in(this->inputImage);
+
+        cleanDirty();
+
         waImageo out(this->outputImage);
         waTransform outT(this->outputTransform);
 
-        if(in->isEmpty()) return;
+		if(in->isEmpty()) return;
 
-        const CImgList<Ti>& inimg = in->getCImgList();
-        CImgList<To>& img = out->getCImgList();
+        const cimg_library::CImgList<Ti>& inimg = in->getCImgList();
+        cimg_library::CImgList<To>& img = out->getCImgList();
         if(updateImage) img.assign(inimg);	// copy
         if(updateTransform) outT->operator=(inT);	// copy
 
@@ -223,7 +219,7 @@ protected:
             {
                 float sigma_s=0;  if(p.size()) sigma_s=(float)p[0];
                 float sigma_r=0; if(p.size()>1) sigma_r=(float)p[1];
-                cimglist_for(img,l) img(l)=inimg(l).get_blur_bilateral (sigma_s,sigma_r);
+                cimglist_for(img,l) img(l)=inimg(l).get_blur_bilateral (inimg(l), sigma_s,sigma_r);
             }
             break;
         case BLURANISOTROPIC:
@@ -255,6 +251,19 @@ protected:
                 if(updateTransform)
                 {
                     outT->getTranslation()=outT->fromImage( Coord((Real)xmin,(Real)ymin,(Real)zmin) );
+                    outT->setCamPos((Real)(out->getDimensions()[0]-1)/2.0,(Real)(out->getDimensions()[1]-1)/2.0);
+                }
+            }
+            break;
+        case EXPAND:
+            if(updateImage || updateTransform)
+            {
+                unsigned int size=0; if(p.size())   size=(unsigned int)p[0];
+                unsigned int dim[3]= {in->getDimensions()[0],in->getDimensions()[1],in->getDimensions()[2]};
+                if(updateImage) cimglist_for(img,l) img(l)=inimg(l).get_resize(dim[0]+2*size,dim[1]+2*size,dim[2]+2*size,-100,0,0,0.5,0.5,0.5,0);
+                if(updateTransform)
+                {
+                    outT->getTranslation()-=outT->getScale()*size;
                     outT->setCamPos((Real)(out->getDimensions()[0]-1)/2.0,(Real)(out->getDimensions()[1]-1)/2.0);
                 }
             }
@@ -354,12 +363,12 @@ protected:
         case DISTANCE:
             if(updateImage || updateTransform)
             {
-                To value=0; if(p.size()) value=(To)p[0];
+                Ti value=0; if(p.size()) value=(Ti)p[0];
                 float scale=1; if(p.size()>1) scale=(float)p[1];
                 float sizex=(float)inT->getScale()[0]*scale;
                 float sizey=(float)inT->getScale()[1]*scale;
                 float sizez=(float)inT->getScale()[2]*scale;
-                CImg<float> metric_distance(2,2,2,1,0.);
+                cimg_library::CImg<float> metric_distance(2,2,2,1,0);
                 metric_distance(1,0,0)=sizex;
                 metric_distance(0,1,0)=sizey;
                 metric_distance(0,0,1)=sizez;
@@ -388,7 +397,7 @@ protected:
                         To ix = (Incc - Ipcc)*(To)0.5/(To)inT->getScale()[0];
                         To iy = (Icnc - Icpc)*(To)0.5/(To)inT->getScale()[1];
                         To iz = (Iccn - Iccp)*(To)0.5/(To)inT->getScale()[2];
-                        *(ptrd++) = sqrt( (SReal) ix*ix+iy*iy+iz*iz);
+                        *(ptrd++) = (To)sqrt( (SReal) ix*ix+iy*iy+iz*iz);
                     }
                 }
             }
@@ -421,7 +430,7 @@ protected:
                 To o2=cimg_library::cimg::type<To>::max();    if(p.size()>1) o2=(To)p[1];
                 Ti i1=cimg_library::cimg::type<Ti>::min();    if(p.size()>2) i1=(Ti)p[2];
                 Ti i2=cimg_library::cimg::type<Ti>::max();    if(p.size()>3) i2=(Ti)p[3];
-                cimglist_for(img,l) {img(l)=inimg(l).get_cut(i1 , i2).get_normalize( o1   , o2);  }
+                cimglist_for(img,l) {img(l)=inimg(l).get_cut(i1 , i2).get_normalize( (Ti)o1, (Ti)o2); }
             }
             break;
         case RESAMPLE:
@@ -442,7 +451,11 @@ protected:
 
                 outT->getTranslation() = origin;
                 outT->getScale() = scale;
-                outT->setCamPos((Real)(out->getDimensions()[0]-1)/2.0,(Real)(out->getDimensions()[1]-1)/2.0);
+                outT->getRotation() = Coord();
+                if(dimz!=1) outT->isPerspective()=0;
+                else outT->setCamPos((Real)(out->getDimensions()[0]-1)/2.0,(Real)(out->getDimensions()[1]-1)/2.0);
+                outT->update();
+
 
                 unsigned int nbc=in->getDimensions()[3];
                 Ti OutValue=(Ti)0.;
@@ -483,11 +496,11 @@ protected:
 
                 cimglist_for(img,l)
                 {
-                    const CImgList<Real> grad = inimg(l).get_gradient("xyz");
-                    CImg<Real> flux = inimg(l).get_flux(grad,1,1);
+                    const cimg_library::CImgList<Real> grad = inimg(l).get_gradient("xyz");
+                    cimg_library::CImg<Real> flux = inimg(l).get_flux(grad,1,1);
                     if (dlt2) // correction proposed by Torsello 03
                     {
-                        CImg<Real> logdensity = inimg(l).get_logdensity(inimg(l),grad,flux,dlt1);
+                        cimg_library::CImg<Real> logdensity = inimg(l).get_logdensity(inimg(l),grad,flux,dlt1);
                         flux = inimg(l).get_corrected_flux(logdensity,grad,flux,dlt2);
                     }
                     img(l) = inimg(l).get_skeleton(flux,inimg(l),curve,thresh);
@@ -501,7 +514,7 @@ protected:
                 typename InImageTypes::imCoord dim = in->getDimensions();
 
                 // a mask to know which pixel to compute
-                CImg<bool> mask;
+                cimg_library::CImg<bool> mask;
                 mask.assign( dim[0], dim[1], dim[2], 1 );
 
                 unsigned int maxDiffusionIterations=0; if(p.size()) maxDiffusionIterations=(unsigned int)p[0];
@@ -509,7 +522,7 @@ protected:
                 bool excludeOutside=true; if(p.size()>2) excludeOutside=(p[2]!=0);
                 To threshold=std::numeric_limits<To>::epsilon(); if(p.size()>3) threshold=(To)p[3];
 
-                CImg<To> imTmp;
+                cimg_library::CImg<To> imTmp;
 
                 cimglist_for(inimg,l)
                 {
@@ -545,8 +558,8 @@ protected:
                                         for(int zz=z-1;zz<=z+1;++zz)
                                         {
                                             if( xx >= 0 && xx<mask.width() &&
-                                                yy >= 0 && yy<mask.height() &&
-                                                zz >= 0 && zz<mask.depth() )
+                                                    yy >= 0 && yy<mask.height() &&
+                                                    zz >= 0 && zz<mask.depth() )
                                             {
                                                 ++nb;
                                                 mean+=(SReal)img(l)(xx,yy,zz);
@@ -585,7 +598,7 @@ protected:
 
                 cimglist_for(img,l)
                 {
-                    CImg<unsigned char> im = inimg(l);
+                    cimg_library::CImg<unsigned char> im = inimg(l);
                     cimg_foroff(im,off) if( im[off]!=0 ) im[off]=1;
                     unsigned char fillColor = (unsigned char)2;
                     im.draw_fill(0,0,0,&fillColor); // flood fill from voxel (0,0,0)
@@ -614,16 +627,36 @@ protected:
 
                 cimglist_for(img,l)
                 {
-                    img(l).label(false,tol);
+                    typedef unsigned int Tlabel;
+                    cimg_library::CImg<Tlabel> im = inimg(l);
+                    im.label(false,tol);
                     //histo
-                    std::map<To,unsigned int> histo;
-                    cimg_foroff(img(l),off) histo[img(l)[off]]++;
-                    To val=0; unsigned int mx=0;
+                    std::map<Tlabel,unsigned long> histo;
+                    cimg_foroff(im,off) histo[im[off]]++;
+                    Tlabel val=0; unsigned long mx=0;
                     // get max size
-                    for (typename std::map<To,unsigned int>::iterator it=histo.begin(); it!=histo.end(); ++it) if(it->second>=mx && it->first!=(To)0.) { mx=it->second; val=it->first; }
+                    for (typename std::map<Tlabel,unsigned long>::iterator it=histo.begin(); it!=histo.end(); ++it) if(it->second>=mx && it->first!=(Tlabel)0.) { mx=it->second; val=it->first; }
                     // mask input
-                    cimg_foroff(img(l),off) if(img(l)[off]==val) img(l)[off]=(To)inimg(l)[off]; else     img(l)[off]=(To)0.;
+                    cimg_foroff(im,off) if(im[off]==val) img(l)[off]=(To)inimg(l)[off]; else     img(l)[off]=(To)0.;
                 }
+            }
+            break;
+
+        case MIRROR:
+            if(updateImage)
+            {
+                unsigned int axis=0; if(p.size()) axis=(unsigned int)p[0];
+                if(axis==0) cimglist_for(img,l) img(l)=inimg(l).get_mirror ('x');
+                else if(axis==0) cimglist_for(img,l) img(l)=inimg(l).get_mirror ('y');
+                else cimglist_for(img,l) img(l)=inimg(l).get_mirror ('z');
+            }
+            break;
+
+        case SHARPEN:
+            if(updateImage)
+            {
+                float sigma=0; if(p.size()) sigma=(float)p[0];
+                cimglist_for(img,l) img(l)=inimg(l).get_sharpen(sigma);
             }
             break;
 
@@ -631,7 +664,8 @@ protected:
             break;
         }
 
-        if(updateTransform) outT->update(); // update internal data
+        if (updateTransform) outT->update(); // update internal data
+
     }
 
 };

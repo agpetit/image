@@ -1,23 +1,20 @@
 /******************************************************************************
-*       SOFA, Simulation Open-Framework Architecture, version 1.0 beta 4      *
-*                (c) 2006-2009 MGH, INRIA, USTL, UJF, CNRS                    *
+*       SOFA, Simulation Open-Framework Architecture, development version     *
+*                (c) 2006-2018 INRIA, USTL, UJF, CNRS, MGH                    *
 *                                                                             *
-* This library is free software; you can redistribute it and/or modify it     *
+* This program is free software; you can redistribute it and/or modify it     *
 * under the terms of the GNU Lesser General Public License as published by    *
 * the Free Software Foundation; either version 2.1 of the License, or (at     *
 * your option) any later version.                                             *
 *                                                                             *
-* This library is distributed in the hope that it will be useful, but WITHOUT *
+* This program is distributed in the hope that it will be useful, but WITHOUT *
 * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or       *
 * FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License *
 * for more details.                                                           *
 *                                                                             *
 * You should have received a copy of the GNU Lesser General Public License    *
-* along with this library; if not, write to the Free Software Foundation,     *
-* Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA.          *
+* along with this program. If not, see <http://www.gnu.org/licenses/>.        *
 *******************************************************************************
-*                               SOFA :: Modules                               *
-*                                                                             *
 * Authors: The SOFA Team and external contributors (see Authors.txt)          *
 *                                                                             *
 * Contact information: contact@sofa-framework.org                             *
@@ -26,19 +23,19 @@
 #ifndef SOFA_IMAGE_IMAGEEXPORTER_H
 #define SOFA_IMAGE_IMAGEEXPORTER_H
 
-#include "initImage.h"
+#include <image/config.h>
 #include "ImageTypes.h"
 
 #include <sofa/core/objectmodel/BaseObject.h>
 #include <sofa/defaulttype/VecTypes.h>
-#include <sofa/component/component.h>
 #include <sofa/core/objectmodel/DataFileName.h>
 #include <sofa/core/behavior/BaseMechanicalState.h>
 #include <sofa/core/objectmodel/Event.h>
-#include <sofa/simulation/common/AnimateBeginEvent.h>
-#include <sofa/simulation/common/AnimateEndEvent.h>
+#include <sofa/simulation/AnimateBeginEvent.h>
+#include <sofa/simulation/AnimateEndEvent.h>
 #include <sofa/core/objectmodel/KeypressedEvent.h>
 #include <sofa/core/objectmodel/KeyreleasedEvent.h>
+#include <sofa/core/objectmodel/GUIEvent.h>
 #include <sofa/defaulttype/Mat.h>
 #include <sofa/defaulttype/Quat.h>
 #include <sofa/helper/rmath.h>
@@ -52,41 +49,40 @@ namespace component
 namespace misc
 {
 
-using cimg_library::CImg;
-using defaulttype::Vec;
-using defaulttype::Mat;
-
 
 
 
 
 /// Default implementation does not compile
-template <int imageTypeLabel>
+template <class ImageType>
 struct ImageExporterSpecialization
 {
 };
 
+/// forward declaration
+template <class ImageType> class ImageExporter;
+
 
 /// Specialization for regular Image
-template <>
-struct ImageExporterSpecialization<defaulttype::IMAGELABEL_IMAGE>
+template <class T>
+struct ImageExporterSpecialization<defaulttype::Image<T>>
 {
-    template<class ImageExporter>
-    static void init( ImageExporter& /*exporter*/ )
+    typedef ImageExporter<defaulttype::Image<T>> ImageExporterT;
+
+
+    static void init( ImageExporterT& /*exporter*/ )
     {
     }
 
-    template<class ImageExporter>
-    static bool write( ImageExporter& exporter )
+    static bool write( ImageExporterT& exporter )
     {
-        typedef typename ImageExporter::Real Real;
-        typedef typename ImageExporter::T T;
+        typedef typename ImageExporterT::Real Real;
 
         if (!exporter.m_filename.isSet()) { exporter.serr << "ImageExporter: file not set"<<exporter.name<<exporter.sendl; return false; }
         std::string fname(exporter.m_filename.getFullPath());
 
-        typename ImageExporter::raImage rimage(exporter.image);
-        typename ImageExporter::raTransform rtransform(exporter.transform);
+        typename ImageExporterT::raImage rimage(exporter.image);
+        typename ImageExporterT::raTransform rtransform(exporter.transform);
         if (rimage->isEmpty()) { exporter.serr << "ImageExporter: no image "<<exporter.name<<exporter.sendl; return false; }
 
         if(fname.find(".mhd")!=std::string::npos || fname.find(".MHD")!=std::string::npos || fname.find(".Mhd")!=std::string::npos
@@ -96,13 +92,13 @@ struct ImageExporterSpecialization<defaulttype::IMAGELABEL_IMAGE>
 
             double scale[3]; for(unsigned int i=0; i<3; i++) scale[i]=(double)rtransform->getScale()[i];
             double translation[3]; for(unsigned int i=0; i<3; i++) translation[i]=(double)rtransform->getTranslation()[i];
-            Vec<3,Real> rotation = rtransform->getRotation() * (Real)M_PI / (Real)180.0;
+            defaulttype::Vec<3,Real> rotation = rtransform->getRotation() * (Real)M_PI / (Real)180.0;
             helper::Quater< Real > q = helper::Quater< Real >::createQuaterFromEuler(rotation);
-            Mat<3,3,Real> R;  q.toMatrix(R);
+            defaulttype::Mat<3,3,Real> R;  q.toMatrix(R);
             double affine[9]; for(unsigned int i=0; i<3; i++) for(unsigned int j=0; j<3; j++) affine[3*i+j]=(double)R[i][j];
             double offsetT=(double)rtransform->getOffsetT();
             double scaleT=(double)rtransform->getScaleT();
-            bool isPerspective=rtransform->isPerspective();
+            int isPerspective=rtransform->isPerspective();
             cimg_library::save_metaimage<T,double>(rimage->getCImgList(),fname.c_str(),scale,translation,affine,offsetT,scaleT,isPerspective);
         }
         else if(fname.find(".nfo")!=std::string::npos || fname.find(".NFO")!=std::string::npos || fname.find(".Nfo")!=std::string::npos)
@@ -110,19 +106,19 @@ struct ImageExporterSpecialization<defaulttype::IMAGELABEL_IMAGE>
             // nfo files are used for compatibility with gridmaterial of frame and voxelizer plugins
             std::ofstream fileStream (fname.c_str(), std::ofstream::out);
             if (!fileStream.is_open()) { exporter.serr << "GridMaterial, Can not open " << fname << exporter.sendl; return false; }
-            fileStream << "voxelType: " << CImg<T>::pixel_type() << std::endl;
+            fileStream << "voxelType: " << cimg_library::CImg<T>::pixel_type() << std::endl;
             fileStream << "dimensions: " << rimage->getDimensions()[0] << " " << rimage->getDimensions()[1]<< " " << rimage->getDimensions()[2]  << std::endl;
             fileStream << "origin: " << rtransform->getTranslation()[0] << " " << rtransform->getTranslation()[1]<< " " << rtransform->getTranslation()[2]<< std::endl;
             fileStream << "voxelSize: " << rtransform->getScale()[0] << " " << rtransform->getScale()[1]<< " " << rtransform->getScale()[2]<< std::endl;
             fileStream.close();
             std::string imgName (fname);  imgName.replace(imgName.find_last_of('.')+1,imgName.size(),"raw");
-            CImg<unsigned char> ucimg = rimage->getCImg(exporter.time);
+            cimg_library::CImg<unsigned char> ucimg = rimage->getCImg(exporter.time);
             ucimg.save_raw(imgName.c_str());
         }
         else if	(fname.find(".cimg")!=std::string::npos || fname.find(".CIMG")!=std::string::npos || fname.find(".Cimg")!=std::string::npos || fname.find(".CImg")!=std::string::npos)
             rimage->getCImgList().save_cimg(fname.c_str());
         else if(fname.find(".avi")!=std::string::npos || fname.find(".mov")!=std::string::npos || fname.find(".asf")!=std::string::npos || fname.find(".divx")!=std::string::npos || fname.find(".flv")!=std::string::npos || fname.find(".mpg")!=std::string::npos || fname.find(".m1v")!=std::string::npos || fname.find(".m2v")!=std::string::npos || fname.find(".m4v")!=std::string::npos || fname.find(".mjp")!=std::string::npos || fname.find(".mkv")!=std::string::npos || fname.find(".mpe")!=std::string::npos || fname.find(".movie")!=std::string::npos || fname.find(".ogm")!=std::string::npos || fname.find(".ogg")!=std::string::npos || fname.find(".qt")!=std::string::npos || fname.find(".rm")!=std::string::npos || fname.find(".vob")!=std::string::npos || fname.find(".wmv")!=std::string::npos || fname.find(".xvid")!=std::string::npos || fname.find(".mpeg")!=std::string::npos )
-            rimage->getCImgList().save_ffmpeg(fname.c_str());
+            rimage->getCImgList().save_ffmpeg_external(fname.c_str());
         else if (fname.find(".hdr")!=std::string::npos || fname.find(".nii")!=std::string::npos)
         {
             float voxsize[3];
@@ -166,21 +162,21 @@ struct ImageExporterSpecialization<defaulttype::IMAGELABEL_IMAGE>
             header.nifti_QForm = 1; //method 2
             header.nifti_SForm = 0;
 
-            Vec<3,Real> rotation = rtransform->getRotation() * (Real)M_PI / (Real)180.0;
+            defaulttype::Vec<3,Real> rotation = rtransform->getRotation() * (Real)M_PI / (Real)180.0;
             helper::Quater<Real> q = helper::Quater<Real>::createQuaterFromEuler(rotation);
 
             for (unsigned int i = 0; i< 3; i++)
             {
-                header.nifti_quaternion[i]   = q[i+1];
-                header.nifti_quaternion[3+i] = rtransform->getTranslation()[i];
+                header.nifti_quaternion[i]   = (float)q[i+1];
+                header.nifti_quaternion[3+i] = (float)rtransform->getTranslation()[i];
             }
 
             defaulttype::Matrix3 mat;
             q.toMatrix(mat);
 
-            header.nifti_affine[0] = mat(0,0) * voxsize[0]; header.nifti_affine[1] = mat(0,1);              header.nifti_affine[2] = mat(0,2);               header.nifti_affine[3] = rtransform->getTranslation()[0];
-            header.nifti_affine[4] = mat(1,0);              header.nifti_affine[5] = mat(1,1) * voxsize[1]; header.nifti_affine[6] = mat(1,2);               header.nifti_affine[7] = rtransform->getTranslation()[1];
-            header.nifti_affine[8] = mat(2,0);              header.nifti_affine[9] = mat(2,1);              header.nifti_affine[10] = mat(2,2) * voxsize[2]; header.nifti_affine[11] = rtransform->getTranslation()[2];
+            header.nifti_affine[0] = (float)(mat(0,0) * voxsize[0]); header.nifti_affine[1] =(float) mat(0,1);              header.nifti_affine[2] = (float)mat(0,2);               header.nifti_affine[3] = (float)rtransform->getTranslation()[0];
+            header.nifti_affine[4] = (float)mat(1,0);              header.nifti_affine[5] = (float)(mat(1,1) * voxsize[1]); header.nifti_affine[6] = (float)mat(1,2);               header.nifti_affine[7] = (float)rtransform->getTranslation()[1];
+            header.nifti_affine[8] = (float)mat(2,0);              header.nifti_affine[9] = (float)mat(2,1);              header.nifti_affine[10] = (float)(mat(2,2) * voxsize[2]); header.nifti_affine[11] = (float)rtransform->getTranslation()[2];
 
             header.nifti_magic[0] = 'n';
             if (fname.find(".hdr")!=std::string::npos)
@@ -215,10 +211,9 @@ struct ImageExporterSpecialization<defaulttype::IMAGELABEL_IMAGE>
 
 
 template <class _ImageTypes>
-class ImageExporter : public virtual core::objectmodel::BaseObject
+class ImageExporter : public core::objectmodel::BaseObject
 {
-    friend struct ImageExporterSpecialization<defaulttype::IMAGELABEL_IMAGE>;
-    friend struct ImageExporterSpecialization<defaulttype::IMAGELABEL_BRANCHINGIMAGE>;
+    friend struct ImageExporterSpecialization<_ImageTypes>;
 
 public:
     typedef core::objectmodel::BaseObject Inherited;
@@ -229,24 +224,24 @@ public:
     typedef typename ImageTypes::T T;
     typedef typename ImageTypes::imCoord imCoord;
     typedef helper::ReadAccessor<Data< ImageTypes > > raImage;
-    Data< ImageTypes > image;
+    Data< ImageTypes > image; ///< image
 
     // transform data
     typedef SReal Real;
     typedef defaulttype::ImageLPTransform<Real> TransformType;
     typedef typename TransformType::Coord Coord;
     typedef helper::ReadAccessor<Data< TransformType > > raTransform;
-    Data< TransformType > transform;;
+    Data< TransformType > transform;
 
     // output file
     sofa::core::objectmodel::DataFileName m_filename;
 
-    Data<unsigned int> exportEveryNbSteps;
-    Data<bool> exportAtBegin;
-    Data<bool> exportAtEnd;
+    Data<unsigned int> exportEveryNbSteps; ///< export file only at specified number of steps (0=disable)
+    Data<bool> exportAtBegin; ///< export file at the initialization
+    Data<bool> exportAtEnd; ///< export file when the simulation is finished
 
 
-    virtual std::string getTemplateName() const    { return templateName(this);    }
+    virtual std::string getTemplateName() const    override { return templateName(this);    }
     static std::string templateName(const ImageExporter<ImageTypes>* = NULL) { return ImageTypes::Name(); }
 
     ImageExporter()	: Inherited()
@@ -265,28 +260,30 @@ public:
         transform.setReadOnly(true);
         f_listening.setValue(true);
 
-        ImageExporterSpecialization<ImageTypes::label>::init( *this );
+        ImageExporterSpecialization<ImageTypes>::init( *this );
     }
 
     virtual ~ImageExporter() {}
 
-    virtual	void cleanup() 	{ if (exportAtEnd.getValue()) write();	}
+    virtual	void cleanup() override { if (exportAtEnd.getValue()) write();	}
 
-    virtual void bwdInit()	{ if (exportAtBegin.getValue())	write(); }
+    virtual void bwdInit() override { if (exportAtBegin.getValue())	write(); }
 
 protected:
 
 
     bool write()
     {
-        return ImageExporterSpecialization<ImageTypes::label>::write( *this );
+        return ImageExporterSpecialization<ImageTypes>::write( *this );
     }
 
 
-    void handleEvent(sofa::core::objectmodel::Event *event)
+    void handleEvent(sofa::core::objectmodel::Event *event) override
     {
-        if (sofa::core::objectmodel::KeypressedEvent* ev = dynamic_cast<sofa::core::objectmodel::KeypressedEvent*>(event))
+        if (sofa::core::objectmodel::KeypressedEvent::checkEventType(event))
         {
+            sofa::core::objectmodel::KeypressedEvent *ev = static_cast<sofa::core::objectmodel::KeypressedEvent *>(event);
+
             //std::cout << "key pressed " << std::endl;
             switch(ev->getKey())
             {
@@ -297,7 +294,7 @@ protected:
                 break;
             }
         }
-        else if ( /*simulation::AnimateEndEvent* ev =*/  dynamic_cast<simulation::AnimateEndEvent*>(event))
+        else if ( /*simulation::AnimateEndEvent* ev =*/ simulation::AnimateEndEvent::checkEventType(event))
         {
             raImage in(this->image);
             raTransform inT(this->transform);
@@ -320,6 +317,13 @@ protected:
                 stepCounter = 0;
                 write();
             }
+        }
+        else if (sofa::core::objectmodel::GUIEvent::checkEventType(event))
+        {
+            sofa::core::objectmodel::GUIEvent *guiEvent = static_cast<sofa::core::objectmodel::GUIEvent *>(event);
+
+            if (guiEvent->getValueName().compare("ImageExport") == 0)
+                write();
         }
     }
 

@@ -3,41 +3,37 @@
 
 
 /******************************************************************************
-*       SOFA, Simulation Open-Framework Architecture, version 1.0 beta 4      *
-*                (c) 2006-2009 MGH, INRIA, USTL, UJF, CNRS                    *
+*       SOFA, Simulation Open-Framework Architecture, development version     *
+*                (c) 2006-2018 INRIA, USTL, UJF, CNRS, MGH                    *
 *                                                                             *
-* This library is free software; you can redistribute it and/or modify it     *
+* This program is free software; you can redistribute it and/or modify it     *
 * under the terms of the GNU Lesser General Public License as published by    *
 * the Free Software Foundation; either version 2.1 of the License, or (at     *
 * your option) any later version.                                             *
 *                                                                             *
-* This library is distributed in the hope that it will be useful, but WITHOUT *
+* This program is distributed in the hope that it will be useful, but WITHOUT *
 * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or       *
 * FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License *
 * for more details.                                                           *
 *                                                                             *
 * You should have received a copy of the GNU Lesser General Public License    *
-* along with this library; if not, write to the Free Software Foundation,     *
-* Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA.          *
+* along with this program. If not, see <http://www.gnu.org/licenses/>.        *
 *******************************************************************************
-*                               SOFA :: Modules                               *
-*                                                                             *
 * Authors: The SOFA Team and external contributors (see Authors.txt)          *
 *                                                                             *
 * Contact information: contact@sofa-framework.org                             *
 ******************************************************************************/
 
 
-#include "initImage_gui.h"
-#include "ImageTypes.h"
-#include "VectorVis.h"
+#include <image/image_gui/config.h>
+#include <image/ImageTypes.h>
+#include <image/VectorVis.h>
 
-#include <sofa/component/component.h>
 #include <sofa/helper/io/Image.h>
 #include <sofa/helper/gl/Texture.h>
 #include <sofa/core/objectmodel/BaseContext.h>
 #include <sofa/core/objectmodel/Event.h>
-#include <sofa/component/visualmodel/VisualModelImpl.h>
+#include <SofaBaseVisual/VisualModelImpl.h>
 #include <sofa/core/objectmodel/BaseObject.h>
 #include <sofa/core/objectmodel/KeypressedEvent.h>
 #include <sofa/core/visual/VisualParams.h>
@@ -72,7 +68,7 @@ public:
     typedef typename ImageTypes::T T;
     typedef typename ImageTypes::imCoord imCoord;
     typedef helper::ReadAccessor<Data< ImageTypes > > raImage;
-    Data< ImageTypes > image;
+    Data< ImageTypes > image; ///< input image
     
     // @name ToolBoxData
     /**@{*/
@@ -125,7 +121,7 @@ public:
      typedef sofa::component::engine::LabelImageToolBox Label;
     typedef helper::vector<Label*> VecLabel;
         
-    std::string getTemplateName() const  {	return templateName(this);	}
+    std::string getTemplateName() const  override {	return templateName(this);	}
     static std::string templateName(const ImageToolBox<ImageTypes>* = NULL)	{ return ImageTypes::Name(); }
     
     ImageToolBox() : Inherited()
@@ -161,7 +157,7 @@ public:
         //for(unsigned int i=0;i<3;i++)	if(cutplane_tex[i]) delete cutplane_tex[i];
     }
     
-    virtual void init()
+    virtual void init() override
     {
         
         // getvisuals
@@ -219,7 +215,7 @@ public:
     }
     
     
-    virtual void reinit()
+    virtual void reinit() override
     {
         /*waHisto whisto(this->histo);
         waPlane wplane(this->plane);
@@ -230,12 +226,14 @@ public:
         wplane->setClamp(whisto->getClamp());*/
     }
     
-    virtual void handleEvent( sofa::core::objectmodel::Event* /*event*/)
+    virtual void handleEvent( sofa::core::objectmodel::Event* /*event*/) override
     {
         /*typename ImagePlaneType::pCoord pc(0,0,0);
 
-        if (sofa::core::objectmodel::KeypressedEvent* ev = dynamic_cast<sofa::core::objectmodel::KeypressedEvent*>(event))
+        if (sofa::core::objectmodel::KeypressedEvent::checkEventType(event))
         {
+            sofa::core::objectmodel::KeypressedEvent *ev = static_cast<sofa::core::objectmodel::KeypressedEvent *>(event);
+
             waPlane wplane(this->plane);
             unsigned int xmax = this->image.getValue().getDimensions()[0];
             unsigned int ymax = this->image.getValue().getDimensions()[1];
@@ -276,7 +274,7 @@ public:
         }*/
     }
     
-    virtual void draw(const core::visual::VisualParams* /*vparams*/)
+    virtual void draw(const core::visual::VisualParams* /*vparams*/) override
     {}
     
     

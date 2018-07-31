@@ -1,7 +1,6 @@
 #ifndef LABELGRIDIMAGETOOLBOX_H
 #define LABELGRIDIMAGETOOLBOX_H
 
-#include <sofa/component/component.h>
 #include <sofa/core/DataEngine.h>
 #include <sofa/core/objectmodel/BaseObject.h>
 #include <sofa/core/objectmodel/DataFileName.h>
@@ -14,10 +13,10 @@
 
 #include "../labelpointsbysection/labelpointsbysectionimagetoolbox.h"
 #include "../labelbox/labelboximagetoolbox.h"
-#include "ImageTypes.h"
+#include <image/ImageTypes.h>
 
 
-#include "initImage_gui.h"
+#include <image/image_gui/config.h>
 #include <sofa/helper/rmath.h>
 
 
@@ -72,6 +71,8 @@ public:
     {
         Vec2ui sections;
         double ratio;
+
+        InterpolationItem() : ratio(0.0) {}
     };
 
     typedef helper::vector< InterpolationItem > VecII;
@@ -92,7 +93,7 @@ public:
     
     }
     
-    virtual void init()
+    virtual void init() override
     {
         //addOutput(&d_ip);
         //addOutput(&d_p);
@@ -139,7 +140,7 @@ public:
 
     }
     
-    virtual sofa::gui::qt::LabelImageToolBoxAction* createTBAction(QWidget*parent=NULL)
+    virtual sofa::gui::qt::LabelImageToolBoxAction* createTBAction(QWidget*parent=NULL) override
     {
         return new sofa::gui::qt::LabelGridImageToolBoxAction(this,parent);
     }
@@ -841,7 +842,7 @@ public:
 //    Data< helper::vector<sofa::defaulttype::Vec3d> > d_p;
     Data< Vec2ui > d_reso;
     DataFileName d_filename;
-    Data< TransformType> d_transform;
+    Data< TransformType> d_transform; ///< Transform
     Data< Quads > d_outQuads;
     Data< Edges > d_outEdges;
     Data< helper::vector<sofa::defaulttype::Vec3d> > d_outImagePosition;
@@ -885,7 +886,7 @@ public:
 
     }
 
-    virtual void init()
+    virtual void init() override
     {
         Inherited::init();
         addInput(&d_image);
@@ -901,7 +902,7 @@ public:
 
 
 public:
-    Data< ImageTypes >   d_image;
+    Data< ImageTypes >   d_image; ///< Input image
 };
 
 

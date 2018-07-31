@@ -1,29 +1,32 @@
 /******************************************************************************
-*       SOFA, Simulation Open-Framework Architecture, version 1.0 beta 4      *
-*                (c) 2006-2009 MGH, INRIA, USTL, UJF, CNRS                    *
+*       SOFA, Simulation Open-Framework Architecture, development version     *
+*                (c) 2006-2018 INRIA, USTL, UJF, CNRS, MGH                    *
 *                                                                             *
-* This library is free software; you can redistribute it and/or modify it     *
+* This program is free software; you can redistribute it and/or modify it     *
 * under the terms of the GNU Lesser General Public License as published by    *
 * the Free Software Foundation; either version 2.1 of the License, or (at     *
 * your option) any later version.                                             *
 *                                                                             *
-* This library is distributed in the hope that it will be useful, but WITHOUT *
+* This program is distributed in the hope that it will be useful, but WITHOUT *
 * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or       *
 * FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License *
 * for more details.                                                           *
 *                                                                             *
 * You should have received a copy of the GNU Lesser General Public License    *
-* along with this library; if not, write to the Free Software Foundation,     *
-* Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA.          *
+* along with this program. If not, see <http://www.gnu.org/licenses/>.        *
 *******************************************************************************
-*                               SOFA :: Modules                               *
-*                                                                             *
 * Authors: The SOFA Team and external contributors (see Authors.txt)          *
 *                                                                             *
 * Contact information: contact@sofa-framework.org                             *
 ******************************************************************************/
+#include <image/config.h>
 #include <sofa/helper/system/config.h>
-#include "initImage.h"
+
+#ifdef SOFA_HAVE_SOFAPYTHON
+    #include <SofaPython/PythonFactory.h>
+    #include "python/Binding_ImageData.h"
+#endif
+
 
 namespace sofa
 {
@@ -48,6 +51,26 @@ void initExternalModule()
     if (first)
     {
         first = false;
+
+#ifdef SOFA_HAVE_SOFAPYTHON
+        if( PythonFactory::s_sofaPythonModule ) // add the module only if the Sofa module exists (SofaPython is loaded)
+        {
+            simulation::PythonEnvironment::gil lock(__func__);
+            
+            // adding new bindings for Data<Image<T>>
+            SP_ADD_CLASS_IN_FACTORY(ImageCData,sofa::core::objectmodel::Data<sofa::defaulttype::ImageC>)
+            SP_ADD_CLASS_IN_FACTORY(ImageUCData,sofa::core::objectmodel::Data<sofa::defaulttype::ImageUC>)
+            SP_ADD_CLASS_IN_FACTORY(ImageIData,sofa::core::objectmodel::Data<sofa::defaulttype::ImageI>)
+            SP_ADD_CLASS_IN_FACTORY(ImageUIData,sofa::core::objectmodel::Data<sofa::defaulttype::ImageUI>)
+            SP_ADD_CLASS_IN_FACTORY(ImageSData,sofa::core::objectmodel::Data<sofa::defaulttype::ImageS>)
+            SP_ADD_CLASS_IN_FACTORY(ImageUSData,sofa::core::objectmodel::Data<sofa::defaulttype::ImageUS>)
+            SP_ADD_CLASS_IN_FACTORY(ImageLData,sofa::core::objectmodel::Data<sofa::defaulttype::ImageL>)
+            SP_ADD_CLASS_IN_FACTORY(ImageULData,sofa::core::objectmodel::Data<sofa::defaulttype::ImageUL>)
+            SP_ADD_CLASS_IN_FACTORY(ImageFData,sofa::core::objectmodel::Data<sofa::defaulttype::ImageF>)
+            SP_ADD_CLASS_IN_FACTORY(ImageDData,sofa::core::objectmodel::Data<sofa::defaulttype::ImageD>)
+            SP_ADD_CLASS_IN_FACTORY(ImageBData,sofa::core::objectmodel::Data<sofa::defaulttype::ImageB>)
+        }
+#endif
     }
 }
 
@@ -91,7 +114,9 @@ SOFA_LINK_CLASS(ImageFilter)
 SOFA_LINK_CLASS(ImageOperation)
 SOFA_LINK_CLASS(ImageSampler)
 SOFA_LINK_CLASS(ImageTransform)
+SOFA_LINK_CLASS(ImageTransformEngine)
 SOFA_LINK_CLASS(ImageValuesFromPositions)
+SOFA_LINK_CLASS(ImageToRigidMassEngine)
 #ifndef SOFA_NO_OPENGL
 SOFA_LINK_CLASS(ImageViewer)
 #endif /* SOFA_NO_OPENGL */
@@ -103,4 +128,6 @@ SOFA_LINK_CLASS(TransferFunction)
 #ifdef SOFA_HAVE_LIBFREENECT
 SOFA_LINK_CLASS(Kinect)
 #endif
-
+#ifdef SOFA_HAVE_realsense2
+SOFA_LINK_CLASS(RealSenseCam)
+#endif

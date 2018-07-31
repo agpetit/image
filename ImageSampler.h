@@ -1,23 +1,20 @@
 /******************************************************************************
-*       SOFA, Simulation Open-Framework Architecture, version 1.0 beta 4      *
-*                (c) 2006-2009 MGH, INRIA, USTL, UJF, CNRS                    *
+*       SOFA, Simulation Open-Framework Architecture, development version     *
+*                (c) 2006-2018 INRIA, USTL, UJF, CNRS, MGH                    *
 *                                                                             *
-* This library is free software; you can redistribute it and/or modify it     *
+* This program is free software; you can redistribute it and/or modify it     *
 * under the terms of the GNU Lesser General Public License as published by    *
 * the Free Software Foundation; either version 2.1 of the License, or (at     *
 * your option) any later version.                                             *
 *                                                                             *
-* This library is distributed in the hope that it will be useful, but WITHOUT *
+* This program is distributed in the hope that it will be useful, but WITHOUT *
 * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or       *
 * FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License *
 * for more details.                                                           *
 *                                                                             *
 * You should have received a copy of the GNU Lesser General Public License    *
-* along with this library; if not, write to the Free Software Foundation,     *
-* Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA.          *
+* along with this program. If not, see <http://www.gnu.org/licenses/>.        *
 *******************************************************************************
-*                               SOFA :: Modules                               *
-*                                                                             *
 * Authors: The SOFA Team and external contributors (see Authors.txt)          *
 *                                                                             *
 * Contact information: contact@sofa-framework.org                             *
@@ -25,17 +22,17 @@
 #ifndef SOFA_IMAGE_IMAGESAMPLER_H
 #define SOFA_IMAGE_IMAGESAMPLER_H
 
-#include "initImage.h"
+#include <image/config.h>
 #include "ImageTypes.h"
 #include "ImageAlgorithms.h"
 #include <sofa/core/DataEngine.h>
-#include <sofa/component/component.h>
 #include <sofa/core/objectmodel/BaseObject.h>
 #include <sofa/core/topology/BaseMeshTopology.h>
 #include <sofa/core/visual/VisualParams.h>
+#include <sofa/helper/system/gl.h>
 
 #include <sofa/core/objectmodel/Event.h>
-#include <sofa/simulation/common/AnimateEndEvent.h>
+#include <sofa/simulation/AnimateEndEvent.h>
 
 #include <sofa/defaulttype/Vec.h>
 #include <sofa/helper/OptionsGroup.h>
@@ -43,6 +40,9 @@
 #define REGULAR 0
 #define LLOYD 1
 
+#define FASTMARCHING 0
+#define DIJKSTRA 1
+#define PARALLELMARCHING 2
 
 namespace sofa
 {
@@ -53,61 +53,53 @@ namespace component
 namespace engine
 {
 
-using helper::vector;
-using defaulttype::Vec;
-using defaulttype::Mat;
-using cimg_library::CImg;
-
-
 
 
 /// Default implementation does not compile
-template <int imageTypeLabel>
+template <class ImageType>
 struct ImageSamplerSpecialization
 {
 };
 
+/// forward declaration
+template <class ImageType> class ImageSampler;
+
 
 /// Specialization for regular Image
-template <>
-struct ImageSamplerSpecialization<defaulttype::IMAGELABEL_IMAGE>
+template <class T>
+struct ImageSamplerSpecialization<defaulttype::Image<T>>
 {
+    typedef ImageSampler<defaulttype::Image<T>> ImageSamplerT;
+
     typedef defaulttype::Image<SReal> DistTypes;
     typedef defaulttype::Image<unsigned int> VorTypes;
 
-    template<class ImageSampler>
-    static void init( ImageSampler* )
+    static void init( ImageSamplerT* )
     {
     }
 
-    template<class ImageSampler>
-    static void regularSampling( ImageSampler* sampler, const bool atcorners=false, const bool recursive=false )
+    static void regularSampling( ImageSamplerT* sampler, const bool atcorners=false, const bool recursive=false )
     {
-//        typedef typename ImageSampler::Real Real;
-        typedef typename ImageSampler::Coord Coord;
-        typedef typename ImageSampler::Edge Edge;
-        typedef typename ImageSampler::Hexa Hexa;
-        typedef typename ImageSampler::T T;
+//        typedef typename ImageSamplerT::Real Real;
+        typedef typename ImageSamplerT::Coord Coord;
+        typedef typename ImageSamplerT::Edge Edge;
+        typedef typename ImageSamplerT::Hexa Hexa;
 
 
         // get tranform and image at time t
-        typename ImageSampler::raImage in(sampler->image);
-        typename ImageSampler::raTransform inT(sampler->transform);
-        const CImg<T>& inimg = in->getCImg(sampler->time);
+        typename ImageSamplerT::raImage in(sampler->image);
+        typename ImageSamplerT::raTransform inT(sampler->transform);
+        const cimg_library::CImg<T>& inimg = in->getCImg(sampler->time);
 
         // data access
-        typename ImageSampler::waPositions pos(sampler->position);       pos.clear();
-        typename ImageSampler::waEdges e(sampler->edges);                e.clear();
-        typename ImageSampler::waEdges g(sampler->graphEdges);           g.clear();
-        typename ImageSampler::waHexa h(sampler->hexahedra);             h.clear();
+        typename ImageSamplerT::waPositions pos(sampler->position);       pos.clear();
+        typename ImageSamplerT::waEdges e(sampler->edges);                e.clear();
+        typename ImageSamplerT::waEdges g(sampler->graphEdges);           g.clear();
+        typename ImageSamplerT::waHexa h(sampler->hexahedra);             h.clear();
 
         // convert to single channel boolean image
-        CImg<bool> img(inimg.width(),inimg.height(),inimg.depth(),1,false);
-        if(atcorners)
-        {
-            CImg_2x2x2(I,bool);
-            cimg_for2x2x2(inimg,x,y,z,0,I,bool) if(Iccc || Iccn || Icnc || Incc || Innc || Incn || Icnn || Innn) img(x,y,z)=true;
-        }
+        cimg_library::CImg<bool> img(inimg.width()+1,inimg.height()+1,inimg.depth()+1,1,false);
+        if(atcorners) {  cimg_forXYZC(inimg,x,y,z,c) if(inimg(x,y,z,c)) { img(x,y,z)=img(x+1,y,z)=img(x,y+1,z)=img(x+1,y+1,z)=img(x,y,z+1)=img(x+1,y,z+1)=img(x,y+1,z+1)=img(x+1,y+1,z+1)=true; } }
         else cimg_forXYZC(inimg,x,y,z,c) if(inimg(x,y,z,c)) img(x,y,z)=true;
 
         // count non empty voxels
@@ -115,8 +107,8 @@ struct ImageSamplerSpecialization<defaulttype::IMAGELABEL_IMAGE>
         cimg_foroff(img,off) if(img[off]) nb++;
         pos.resize(nb);
         // record indices of previous y line and z plane for connectivity
-        CImg<unsigned int> pLine(inimg.width()),nLine(inimg.width());
-        CImg<unsigned int> pPlane(inimg.width(),inimg.height()),nPlane(inimg.width(),inimg.height());
+        cimg_library::CImg<unsigned int> pLine(img.width()),nLine(img.width());
+        cimg_library::CImg<unsigned int> pPlane(img.width(),img.height()),nPlane(img.width(),img.height());
         // fill pos and edges
         nb=0;
         cimg_forZ(img,z)
@@ -128,7 +120,7 @@ struct ImageSamplerSpecialization<defaulttype::IMAGELABEL_IMAGE>
                     if(img(x,y,z))
                     {
                         // pos
-                        if(atcorners) pos[nb]=Coord(x+0.5,y+0.5,z+0.5);
+                        if(atcorners) pos[nb]=Coord(x-0.5,y-0.5,z-0.5);
                         else pos[nb]=Coord(x,y,z);
                         // edges
                         if(x) if(img(x-1,y,z)) e.push_back(Edge(nb-1,nb));
@@ -149,7 +141,7 @@ struct ImageSamplerSpecialization<defaulttype::IMAGELABEL_IMAGE>
 
         if(recursive)
         {
-            vector<unsigned int> indices; indices.resize(pos.size()); for(unsigned int i=0; i<pos.size(); i++) indices[i]=i;
+            helper::vector<unsigned int> indices; indices.resize(pos.size()); for(unsigned int i=0; i<pos.size(); i++) indices[i]=i;
             sampler->subdivide(indices);
         }
 
@@ -157,47 +149,45 @@ struct ImageSamplerSpecialization<defaulttype::IMAGELABEL_IMAGE>
     }
 
 
-    template<class ImageSampler>
-    static void uniformSampling( ImageSampler* sampler,const unsigned int nb=0,  const bool bias=false, const unsigned int lloydIt=100,const bool useDijkstra=false )
+    static void uniformSampling( ImageSamplerT* sampler,const unsigned int nb=0,  const bool bias=false, const unsigned int lloydIt=100,const unsigned int method=FASTMARCHING, const unsigned int pmmIter = std::numeric_limits<unsigned int>::max(), const SReal pmmTol = 10 )
     {
-        typedef typename ImageSampler::Real Real;
-        typedef typename ImageSampler::Coord Coord;
-//        typedef typename ImageSampler::Edge Edge;
-//        typedef typename ImageSampler::Hexa Hexa;
-        typedef typename ImageSampler::T T;
+        typedef typename ImageSamplerT::Real Real;
+        typedef typename ImageSamplerT::Coord Coord;
+//        typedef typename ImageSamplerT::Edge Edge;
+//        typedef typename ImageSamplerT::Hexa Hexa;
 
         clock_t timer = clock();
 
         // get tranform and image at time t
-        typename ImageSampler::raImage in(sampler->image);
-        typename ImageSampler::raTransform inT(sampler->transform);
-        const CImg<T>& inimg = in->getCImg(sampler->time);
-        const CImg<T>* biasFactor=bias?&inimg:NULL;
+        typename ImageSamplerT::raImage in(sampler->image);
+        typename ImageSamplerT::raTransform inT(sampler->transform);
+        const cimg_library::CImg<T>& inimg = in->getCImg(sampler->time);
+        const cimg_library::CImg<T>* biasFactor=bias?&inimg:NULL;
 
         // data access
-        typename ImageSampler::raPositions fpos(sampler->fixedPosition);
-        typename ImageSampler::waEdges e(sampler->edges);                e.clear();
-        typename ImageSampler::waEdges g(sampler->graphEdges);           g.clear();
-        typename ImageSampler::waHexa h(sampler->hexahedra);             h.clear();
+        typename ImageSamplerT::raPositions fpos(sampler->fixedPosition);
+        typename ImageSamplerT::waEdges e(sampler->edges);                e.clear();
+        typename ImageSamplerT::waEdges g(sampler->graphEdges);           g.clear();
+        typename ImageSamplerT::waHexa h(sampler->hexahedra);             h.clear();
 
-        typename ImageSampler::imCoord dim = in->getDimensions();
+        typename ImageSamplerT::imCoord dim = in->getDimensions();
 
         // init voronoi and distances
         dim[3]=dim[4]=1;
-        typename ImageSampler::waVor vorData(sampler->voronoi);
+        typename ImageSamplerT::waVor vorData(sampler->voronoi);
         vorData->setDimensions(dim);
-        CImg<unsigned int>& voronoi = vorData->getCImg(); voronoi.fill(0);
-        typename ImageSampler::waDist distData(sampler->distances);
+        cimg_library::CImg<unsigned int>& voronoi = vorData->getCImg(); voronoi.fill(0);
+        typename ImageSamplerT::waDist distData(sampler->distances);
         distData->setDimensions(dim);
-        CImg<Real>& dist = distData->getCImg(); dist.fill(-1);
+        cimg_library::CImg<Real>& dist = distData->getCImg(); dist.fill(-1);
         cimg_forXYZC(inimg,x,y,z,c) if(inimg(x,y,z,c)) dist(x,y,z)=cimg_library::cimg::type<Real>::max();
 
         // list of seed points
         std::set<std::pair<Real,sofa::defaulttype::Vec<3,int> > > trial;
 
         // add fixed points
-        vector<unsigned int> fpos_voronoiIndex;
-        vector<Coord> fpos_VoxelIndex;
+        helper::vector<unsigned int> fpos_voronoiIndex;
+        helper::vector<Coord> fpos_VoxelIndex;
 
         for(unsigned int i=0; i<fpos.size(); i++)
         {
@@ -207,13 +197,18 @@ struct ImageSamplerSpecialization<defaulttype::IMAGELABEL_IMAGE>
         }
         if(fpos.size())
         {
-            if(useDijkstra) dijkstra<Real,T>(trial,dist, voronoi, sampler->transform.getValue().getScale(), biasFactor);
-            else fastMarching<Real,T>(trial,dist, voronoi, sampler->transform.getValue().getScale(),biasFactor );
+            switch(method)
+            {
+            case FASTMARCHING : fastMarching<Real,T>(trial,dist, voronoi, sampler->transform.getValue().getScale(),biasFactor ); break;
+            case DIJKSTRA : dijkstra<Real,T>(trial,dist, voronoi, sampler->transform.getValue().getScale(), biasFactor); break;
+            case PARALLELMARCHING : parallelMarching<Real,T>(dist, voronoi, sampler->transform.getValue().getScale(), pmmIter, pmmTol, biasFactor); break;
+            default : sampler->serr << "Unknown Distance Field Computation Method" << sampler->sendl; break;
+            };
         }
 
         // farthest point sampling using geodesic distances
-        vector<unsigned int> pos_voronoiIndex;
-        vector<Coord> pos_VoxelIndex;
+        helper::vector<unsigned int> pos_voronoiIndex;
+        helper::vector<Coord> pos_VoxelIndex;
         while(pos_VoxelIndex.size()<nb)
         {
             Real dmax=0;  Coord pmax;
@@ -223,8 +218,13 @@ struct ImageSamplerSpecialization<defaulttype::IMAGELABEL_IMAGE>
                 pos_voronoiIndex.push_back(fpos_VoxelIndex.size()+pos_VoxelIndex.size()+1);
                 pos_VoxelIndex.push_back(pmax);
                 AddSeedPoint<Real>(trial,dist,voronoi, pos_VoxelIndex.back(),pos_voronoiIndex.back());
-                if(useDijkstra) dijkstra<Real,T>(trial,dist, voronoi, sampler->transform.getValue().getScale(), biasFactor);
-                else fastMarching<Real,T>(trial,dist, voronoi, sampler->transform.getValue().getScale(),biasFactor );
+                switch(method)
+                {
+                case FASTMARCHING : fastMarching<Real,T>(trial,dist, voronoi, sampler->transform.getValue().getScale(),biasFactor ); break;
+                case DIJKSTRA : dijkstra<Real,T>(trial,dist, voronoi, sampler->transform.getValue().getScale(), biasFactor); break;
+                case PARALLELMARCHING : parallelMarching<Real,T>(dist, voronoi, sampler->transform.getValue().getScale(), pmmIter, pmmTol, biasFactor); break;
+                default : sampler->serr << "Unknown Distance Field Computation Method" << sampler->sendl; break;
+                };
             }
             else break;
         }
@@ -241,67 +241,71 @@ struct ImageSamplerSpecialization<defaulttype::IMAGELABEL_IMAGE>
                 cimg_foroff(dist,off) if(dist[off]!=-1) dist[off]=cimg_library::cimg::type<Real>::max();
                 for(unsigned int i=0; i<fpos_voronoiIndex.size(); i++) AddSeedPoint<Real>(trial,dist,voronoi, fpos_VoxelIndex[i], fpos_voronoiIndex[i]);
                 for(unsigned int i=0; i<pos_voronoiIndex.size(); i++) AddSeedPoint<Real>(trial,dist,voronoi, pos_VoxelIndex[i], pos_voronoiIndex[i]);
-                if(useDijkstra) dijkstra<Real,T>(trial,dist, voronoi,  sampler->transform.getValue().getScale(), biasFactor);
-                else fastMarching<Real,T>(trial,dist, voronoi,  sampler->transform.getValue().getScale(), biasFactor);
+
+                switch(method)
+                {
+                case FASTMARCHING : fastMarching<Real,T>(trial,dist, voronoi, sampler->transform.getValue().getScale(),biasFactor ); break;
+                case DIJKSTRA : dijkstra<Real,T>(trial,dist, voronoi, sampler->transform.getValue().getScale(), biasFactor); break;
+                case PARALLELMARCHING : parallelMarching<Real,T>(dist, voronoi, sampler->transform.getValue().getScale(), pmmIter, pmmTol, biasFactor); break;
+                default : sampler->serr << "Unknown Distance Field Computation Method" << sampler->sendl; break;
+                };
                 it++; if(it>=lloydIt) converged=true;
             }
             else converged=true;
         }
 
         // add 3D points
-        std::vector<Vec<3,Real> >& pos = *sampler->position.beginEdit();    pos.clear();
+        std::vector<defaulttype::Vec<3,Real> >& pos = *sampler->position.beginEdit();    pos.clear();
         for(unsigned int i=0; i<pos_VoxelIndex.size(); i++) pos.push_back(inT->fromImage(pos_VoxelIndex[i]));
         sampler->position.endEdit();
 
         if(sampler->f_printLog.getValue())
         {
-            std::cout<<sampler->getName()<<": sampling completed in "<< it <<" Lloyd iterations ("<< (clock() - timer) / (float)CLOCKS_PER_SEC <<"s )"<<std::endl;
+            sampler->sout<<sampler->getName()<<": sampling completed in "<< it <<" Lloyd iterations ("<< (clock() - timer) / (float)CLOCKS_PER_SEC <<"s )"<<sampler->sendl;
         }
 
     }
 
 
-    template<class ImageSampler>
-    static void recursiveUniformSampling( ImageSampler* sampler,const unsigned int nb=0,  const bool bias=false, const unsigned int lloydIt=100,const bool useDijkstra=false,  const unsigned int N=1 )
+    static void recursiveUniformSampling( ImageSamplerT* sampler,const unsigned int nb=0,  const bool bias=false, const unsigned int lloydIt=100,const unsigned int method=FASTMARCHING,  const unsigned int N=1, const unsigned int pmmIter=std::numeric_limits<unsigned int>::max(), const SReal pmmTol=10)
     {
-        typedef typename ImageSampler::Real Real;
-        typedef typename ImageSampler::Coord Coord;
-        typedef typename ImageSampler::Edge Edge;
-//        typedef typename ImageSampler::Hexa Hexa;
-        typedef typename ImageSampler::T T;
+        typedef typename ImageSamplerT::Real Real;
+        typedef typename ImageSamplerT::Coord Coord;
+        typedef typename ImageSamplerT::Edge Edge;
+//        typedef typename ImageSamplerT::Hexa Hexa;
 
         clock_t timer = clock();
 
         // get tranform and image at time t
-        typename ImageSampler::raImage in(sampler->image);
-        typename ImageSampler::raTransform inT(sampler->transform);
-        const CImg<T>& inimg = in->getCImg(sampler->time);
-        const CImg<T>* biasFactor=bias?&inimg:NULL;
+        typename ImageSamplerT::raImage in(sampler->image);
+        typename ImageSamplerT::raTransform inT(sampler->transform);
+        const cimg_library::CImg<T>& inimg = in->getCImg(sampler->time);
+        const cimg_library::CImg<T>* biasFactor=bias?&inimg:NULL;
 
         // data access
-        typename ImageSampler::raPositions fpos(sampler->fixedPosition);
-        typename ImageSampler::waEdges e(sampler->edges);                e.clear();
-        typename ImageSampler::waEdges g(sampler->graphEdges);           g.clear();
-        typename ImageSampler::waHexa h(sampler->hexahedra);             h.clear();
+        typename ImageSamplerT::raPositions fpos(sampler->fixedPosition);
+        typename ImageSamplerT::waEdges e(sampler->edges);                e.clear();
+        typename ImageSamplerT::waEdges g(sampler->graphEdges);           g.clear();
+        typename ImageSamplerT::waHexa h(sampler->hexahedra);             h.clear();
 
-        typename ImageSampler::imCoord dim = in->getDimensions();
+        typename ImageSamplerT::imCoord dim = in->getDimensions();
 
         // init voronoi and distances
         dim[3]=dim[4]=1;
-        typename ImageSampler::waVor vorData(sampler->voronoi);
+        typename ImageSamplerT::waVor vorData(sampler->voronoi);
         vorData->setDimensions(dim);
-        CImg<unsigned int>& voronoi = vorData->getCImg(); voronoi.fill(0);
-        typename ImageSampler::waDist distData(sampler->distances);
+        cimg_library::CImg<unsigned int>& voronoi = vorData->getCImg(); voronoi.fill(0);
+        typename ImageSamplerT::waDist distData(sampler->distances);
         distData->setDimensions(dim);
-        CImg<Real>& dist = distData->getCImg(); dist.fill(-1);
+        cimg_library::CImg<Real>& dist = distData->getCImg(); dist.fill(-1);
         cimg_forXYZC(inimg,x,y,z,c) if(inimg(x,y,z,c)) dist(x,y,z)=cimg_library::cimg::type<Real>::max();
 
         // list of seed points
         std::set<std::pair<Real,sofa::defaulttype::Vec<3,int> > > trial;
 
         // add fixed points
-        vector<unsigned int> fpos_voronoiIndex;
-        vector<Coord> fpos_VoxelIndex;
+        helper::vector<unsigned int> fpos_voronoiIndex;
+        helper::vector<Coord> fpos_VoxelIndex;
 
         for(unsigned int i=0; i<fpos.size(); i++)
         {
@@ -311,17 +315,22 @@ struct ImageSamplerSpecialization<defaulttype::IMAGELABEL_IMAGE>
         }
         if(fpos.size())
         {
-            if(useDijkstra) dijkstra<Real,T>(trial,dist, voronoi, sampler->transform.getValue().getScale(), biasFactor);
-            else fastMarching<Real,T>(trial,dist, voronoi, sampler->transform.getValue().getScale(),biasFactor );
+            switch(method)
+            {
+            case FASTMARCHING : fastMarching<Real,T>(trial,dist, voronoi, sampler->transform.getValue().getScale(),biasFactor ); break;
+            case DIJKSTRA : dijkstra<Real,T>(trial,dist, voronoi, sampler->transform.getValue().getScale(), biasFactor); break;
+            case PARALLELMARCHING : parallelMarching<Real,T>(dist, voronoi, sampler->transform.getValue().getScale(), pmmIter, pmmTol, biasFactor); break;
+            default : sampler->serr << "Unknown Distance Field Computation Method" << sampler->sendl; break;
+            };
         }
 
         // new points
-        vector<unsigned int> pos_voronoiIndex;
-        vector<Coord> pos_VoxelIndex;
+        helper::vector<unsigned int> pos_voronoiIndex;
+        helper::vector<Coord> pos_VoxelIndex;
         while(pos_VoxelIndex.size()<nb)
         {
-            vector<unsigned int> newpos_voronoiIndex;
-            vector<Coord> newpos_VoxelIndex;
+            helper::vector<unsigned int> newpos_voronoiIndex;
+            helper::vector<Coord> newpos_VoxelIndex;
 
             // farthest sampling of N points
             unsigned int currentN = N;
@@ -336,8 +345,13 @@ struct ImageSamplerSpecialization<defaulttype::IMAGELABEL_IMAGE>
                 newpos_voronoiIndex.push_back(fpos_VoxelIndex.size()+pos_VoxelIndex.size()+newpos_VoxelIndex.size()+1);
                 newpos_VoxelIndex.push_back(pmax);
                 AddSeedPoint<Real>(trial,dist,voronoi, newpos_VoxelIndex.back(),newpos_voronoiIndex.back());
-                if(useDijkstra) dijkstra<Real,T>(trial,dist, voronoi, sampler->transform.getValue().getScale(), biasFactor);
-                else fastMarching<Real,T>(trial,dist, voronoi, sampler->transform.getValue().getScale(),biasFactor );
+                switch(method)
+                {
+                case FASTMARCHING : fastMarching<Real,T>(trial,dist, voronoi, sampler->transform.getValue().getScale(),biasFactor ); break;
+                case DIJKSTRA : dijkstra<Real,T>(trial,dist, voronoi, sampler->transform.getValue().getScale(), biasFactor); break;
+                case PARALLELMARCHING : parallelMarching<Real,T>(dist, voronoi, sampler->transform.getValue().getScale(), pmmIter, pmmTol, biasFactor); break;
+                default : sampler->serr << "Unknown Distance Field Computation Method" << sampler->sendl; break;
+                };
             }
 
             // lloyd iterations for the N points
@@ -353,8 +367,13 @@ struct ImageSamplerSpecialization<defaulttype::IMAGELABEL_IMAGE>
                     for(unsigned int i=0; i<fpos_VoxelIndex.size(); i++) AddSeedPoint<Real>(trial,dist,voronoi, fpos_VoxelIndex[i], fpos_voronoiIndex[i]);
                     for(unsigned int i=0; i<pos_VoxelIndex.size(); i++)  AddSeedPoint<Real>(trial,dist,voronoi, pos_VoxelIndex[i], pos_voronoiIndex[i]);
                     for(unsigned int i=0; i<newpos_VoxelIndex.size(); i++) AddSeedPoint<Real>(trial,dist,voronoi, newpos_VoxelIndex[i], newpos_voronoiIndex[i]);
-                    if(useDijkstra) dijkstra<Real,T>(trial,dist, voronoi,  sampler->transform.getValue().getScale(), biasFactor);
-                    else fastMarching<Real,T>(trial,dist, voronoi,  sampler->transform.getValue().getScale(), biasFactor);
+                    switch(method)
+                    {
+                    case FASTMARCHING : fastMarching<Real,T>(trial,dist, voronoi, sampler->transform.getValue().getScale(),biasFactor ); break;
+                    case DIJKSTRA : dijkstra<Real,T>(trial,dist, voronoi, sampler->transform.getValue().getScale(), biasFactor); break;
+                    case PARALLELMARCHING : parallelMarching<Real,T>(dist, voronoi, sampler->transform.getValue().getScale(), pmmIter, pmmTol, biasFactor); break;
+                    default : sampler->serr << "Unknown Distance Field Computation Method" << sampler->sendl; break;
+                    };
                     it++; if(it>=lloydIt) converged=true;
                 }
                 else converged=true;
@@ -389,13 +408,13 @@ struct ImageSamplerSpecialization<defaulttype::IMAGELABEL_IMAGE>
         }
 
         // add 3D points
-        std::vector<Vec<3,Real> >& pos = *sampler->position.beginEdit();    pos.clear();
+        std::vector<defaulttype::Vec<3,Real> >& pos = *sampler->position.beginEdit();    pos.clear();
         for(unsigned int i=0; i<pos_VoxelIndex.size(); i++) pos.push_back(inT->fromImage(pos_VoxelIndex[i]));
         sampler->position.endEdit();
 
         if(sampler->f_printLog.getValue())
         {
-            std::cout<<sampler->getName()<<": sampling completed in "<< (clock() - timer) / (float)CLOCKS_PER_SEC <<"s )"<<std::endl;
+            sampler->sout<<sampler->getName()<<": sampling completed in "<< (clock() - timer) / (float)CLOCKS_PER_SEC <<"s )"<<sampler->sendl;
         }
 
         sampler->position.endEdit();
@@ -413,8 +432,7 @@ struct ImageSamplerSpecialization<defaulttype::IMAGELABEL_IMAGE>
 template <class _ImageTypes>
 class ImageSampler : public core::DataEngine
 {
-    friend struct ImageSamplerSpecialization<defaulttype::IMAGELABEL_IMAGE>;
-    friend struct ImageSamplerSpecialization<defaulttype::IMAGELABEL_BRANCHINGIMAGE>;
+    friend struct ImageSamplerSpecialization<_ImageTypes>;
 
 public:
 
@@ -442,63 +460,61 @@ public:
 
     //@name option data
     /**@{*/
-    typedef vector<double> ParamTypes;
+    typedef helper::vector<double> ParamTypes;
     typedef helper::ReadAccessor<Data< ParamTypes > > raParam;
-	typedef helper::WriteAccessor<Data< ParamTypes > > waParam;
 
-    Data<helper::OptionsGroup> method;
-    Data< bool > computeRecursive;
-    Data< ParamTypes > param;
+    Data<helper::OptionsGroup> method; ///< method (param)
+    Data< bool > computeRecursive; ///< if true: insert nodes recursively and build the graph
+    Data< ParamTypes > param; ///< Parameters
     /**@}*/
 
     //@name sample data (points+connectivity)
     /**@{*/
-    typedef vector<Vec<3,Real> > SeqPositions;
+    typedef helper::vector<defaulttype::Vec<3,Real> > SeqPositions;
     typedef helper::ReadAccessor<Data< SeqPositions > > raPositions;
     typedef helper::WriteAccessor<Data< SeqPositions > > waPositions;
-    Data< SeqPositions > position;
-    Data< SeqPositions > fixedPosition;
+    Data< SeqPositions > position; ///< output positions
+    Data< SeqPositions > fixedPosition; ///< user defined sample positions
 
     typedef typename core::topology::BaseMeshTopology::Edge Edge;
     typedef typename core::topology::BaseMeshTopology::SeqEdges SeqEdges;
     typedef helper::ReadAccessor<Data< SeqEdges > > raEdges;
-    typedef helper::WriteAccessor<Data< SeqEdges > > waEdges;
-    Data< SeqEdges > edges;
-    Data< SeqEdges > graphEdges;
+    typedef helper::WriteOnlyAccessor<Data< SeqEdges > > waEdges;
+    Data< SeqEdges > edges; ///< edges connecting neighboring nodes
+    Data< SeqEdges > graphEdges; ///< oriented graph connecting parent to child nodes
 
     typedef typename core::topology::BaseMeshTopology::Hexa Hexa;
     typedef typename core::topology::BaseMeshTopology::SeqHexahedra SeqHexahedra;
-    typedef helper::ReadAccessor<Data< SeqHexahedra > > raHexa;
-    typedef helper::WriteAccessor<Data< SeqHexahedra > > waHexa;
-    Data< SeqHexahedra > hexahedra;
+    typedef helper::WriteOnlyAccessor<Data< SeqHexahedra > > waHexa;
+    Data< SeqHexahedra > hexahedra; ///< output hexahedra
     /**@}*/
 
     //@name distances (may be used for shape function computation)
     /**@{*/
-    typedef typename ImageSamplerSpecialization<ImageTypes::label>::DistTypes DistTypes;
-    typedef helper::ReadAccessor<Data< DistTypes > > raDist;
-    typedef helper::WriteAccessor<Data< DistTypes > > waDist;
+    typedef typename ImageSamplerSpecialization<ImageTypes>::DistTypes DistTypes;
+    typedef helper::WriteOnlyAccessor<Data< DistTypes > > waDist;
     Data< DistTypes > distances;
     /**@}*/
 
     //@name voronoi
     /**@{*/
-    typedef typename ImageSamplerSpecialization<ImageTypes::label>::VorTypes VorTypes;
-    typedef helper::ReadAccessor<Data< VorTypes > > raVor;
-    typedef helper::WriteAccessor<Data< VorTypes > > waVor;
+    typedef typename ImageSamplerSpecialization<ImageTypes>::VorTypes VorTypes;
+    typedef helper::WriteOnlyAccessor<Data< VorTypes > > waVor;
     Data< VorTypes > voronoi;
     /**@}*/
 
     //@name visu data
     /**@{*/
-    Data<bool> f_clearData;
-    Data< float > showSamplesScale;
-    Data< int > drawMode;
-    Data< bool > showEdges;
-    Data< bool > showGraph;
+    Data<bool> f_clearData; ///< clear distance image after computation
+    Data< float > showSamplesScale; ///< show samples
+    Data< int > drawMode; ///< 0: points, 1: spheres
+    Data< bool > showEdges; ///< show edges
+    Data< bool > showGraph; ///< show graph
+	Data< bool > showFaces; ///< show the faces of cubes
+
     /**@}*/
 
-    virtual std::string getTemplateName() const    { return templateName(this);    }
+    virtual std::string getTemplateName() const    override { return templateName(this);    }
     static std::string templateName(const ImageSampler<ImageTypes>* = NULL) { return ImageTypes::Name();    }
     ImageSampler()    :   Inherited()
         , image(initData(&image,ImageTypes(),"image",""))
@@ -515,9 +531,10 @@ public:
         , voronoi(initData(&voronoi,VorTypes(),"voronoi",""))
         , f_clearData(initData(&f_clearData,true,"clearData","clear distance image after computation"))
         , showSamplesScale(initData(&showSamplesScale,0.0f,"showSamplesScale","show samples"))
-        , drawMode(initData(&drawMode,0,"drawMode",""))
+        , drawMode(initData(&drawMode,0,"drawMode","0: points, 1: spheres"))
         , showEdges(initData(&showEdges,false,"showEdges","show edges"))
         , showGraph(initData(&showGraph,false,"showGraph","show graph"))
+        , showFaces(initData(&showFaces,false,"showFaces","show the faces of cubes"))
         , time((unsigned int)0)
     {
         image.setReadOnly(true);
@@ -525,15 +542,15 @@ public:
         f_listening.setValue(true);
 
         helper::OptionsGroup methodOptions(2,"0 - Regular sampling (at voxel center(0) or corners (1)) "
-                ,"1 - Uniform sampling using Fast Marching and Lloyd relaxation (nbSamples | bias distances=false | nbiterations=100  | FastMarching(0)/Dijkstra(1)=1)"
+                ,"1 - Uniform sampling using Fast Marching and Lloyd relaxation (nbSamples | bias distances=false | nbiterations=100  | FastMarching(0)/Dijkstra(1)/ParallelMarching(2)=1 | PMM max iter | PMM tolerance)"
                                           );
         methodOptions.setSelectedItem(REGULAR);
         method.setValue(methodOptions);
 
-        ImageSamplerSpecialization<ImageTypes::label>::init( this );
+        ImageSamplerSpecialization<ImageTypes>::init( this );
     }
 
-    virtual void init()
+    virtual void init() override
     {
         addInput(&image);
         addInput(&transform);
@@ -547,14 +564,16 @@ public:
         setDirtyValue();
     }
 
-    virtual void reinit() { update(); }
+    virtual void reinit() override { update(); }
 
 protected:
 
     unsigned int time;
 
-    virtual void update()
+    virtual void update() override
     {
+        updateAllInputsIfDirty(); // easy to ensure that all inputs are up-to-date
+
         cleanDirty();
 
         raParam params(this->param);
@@ -573,12 +592,14 @@ protected:
             unsigned int nb=0;        if(params.size())       nb=(unsigned int)params[0];
             bool bias=false;          if(params.size()>1)     bias=(bool)params[1];
             unsigned int lloydIt=100; if(params.size()>2)     lloydIt=(unsigned int)params[2];
-            bool Dij=true;            if(params.size()>3)     Dij=(bool)params[3];
+            unsigned int Dij=1;       if(params.size()>3)     Dij=(unsigned int)params[3];
             unsigned int N=1;         if(params.size()>4)     N=(unsigned int)params[4];
+            unsigned int pmmIter=127; if(params.size()>5)     pmmIter=(unsigned int)params[5];
+            Real pmmTol=10;           if(params.size()>6)     pmmTol=(Real)params[6];
 
             // sampling
-            if(!computeRecursive.getValue()) uniformSampling(nb,bias,lloydIt,Dij);
-            else recursiveUniformSampling(nb,bias,lloydIt,Dij,N);
+            if(!computeRecursive.getValue()) uniformSampling(nb,bias,lloydIt,Dij,pmmIter, pmmTol);
+            else recursiveUniformSampling(nb,bias,lloydIt,Dij,N, pmmIter, pmmTol);
         }
 
         // clear distance image ?
@@ -590,16 +611,16 @@ protected:
 
         if(this->f_printLog.getValue())
         {
-            if(this->position.getValue().size())    std::cout<<"ImageSampler: "<< this->position.getValue().size() <<" generated samples"<<std::endl;
-            if(this->edges.getValue().size())       std::cout<<"ImageSampler: "<< this->edges.getValue().size() <<" generated edges"<<std::endl;
-            if(this->hexahedra.getValue().size())   std::cout<<"ImageSampler: "<< this->hexahedra.getValue().size() <<" generated hexahedra"<<std::endl;
-            if(this->graphEdges.getValue().size())       std::cout<<"ImageSampler: "<< this->graphEdges.getValue().size() <<" generated dependencies"<<std::endl;
+            if(this->position.getValue().size())    sout<< this->position.getValue().size() <<" generated samples"<<sendl;
+            if(this->edges.getValue().size())       sout<< this->edges.getValue().size() <<" generated edges"<<sendl;
+            if(this->hexahedra.getValue().size())   sout<< this->hexahedra.getValue().size() <<" generated hexahedra"<<sendl;
+            if(this->graphEdges.getValue().size())  sout<< this->graphEdges.getValue().size() <<" generated dependencies"<<sendl;
         }
     }
 
-    void handleEvent(sofa::core::objectmodel::Event *event)
+    void handleEvent(sofa::core::objectmodel::Event *event) override
     {
-        if ( dynamic_cast<simulation::AnimateEndEvent*>(event))
+        if (simulation::AnimateEndEvent::checkEventType(event))
         {
             raImage in(this->image);
             raTransform inT(this->transform);
@@ -617,7 +638,7 @@ protected:
     }
 
 #ifndef SOFA_NO_OPENGL
-    virtual void draw(const core::visual::VisualParams* vparams)
+    virtual void draw(const core::visual::VisualParams* vparams) override
     {
 #ifndef SOFA_NO_OPENGL
         if (!vparams->displayFlags().getShowVisualModels()) return;
@@ -634,7 +655,7 @@ protected:
             {
             case 1:
                 glPushAttrib(GL_LIGHTING_BIT);
-                glEnable(GL_LIGHTING);
+                vparams->drawTool()->enableLighting();
                 vparams->drawTool()->drawSpheres(this->position.getValue(),showSamplesScale.getValue(),defaulttype::Vec4f(0.1,0.7,0.1,1));
                 vparams->drawTool()->drawSpheres(this->fixedPosition.getValue(),showSamplesScale.getValue(),defaulttype::Vec4f(0.1,0.7,0.1,1));
                 glPopAttrib();
@@ -644,7 +665,7 @@ protected:
             }
         }
 
-
+		
         if (this->showEdges.getValue())
         {
             std::vector<defaulttype::Vector3> points;
@@ -654,7 +675,8 @@ protected:
                 points[2*i][0]=pos[e[i][0]][0];            points[2*i][1]=pos[e[i][0]][1];            points[2*i][2]=pos[e[i][0]][2];
                 points[2*i+1][0]=pos[e[i][1]][0];          points[2*i+1][1]=pos[e[i][1]][1];          points[2*i+1][2]=pos[e[i][1]][2];
             }
-            vparams->drawTool()->drawLines(points,2.0,defaulttype::Vec4f(0.7,1,0.7,1));
+            vparams->drawTool()->drawLines(points,2.0,defaulttype::Vec4f(0.7,0,0.7,1));
+			//vparams->drawTool()->drawTriangles(points, defaulttype::Vec4f(0.7,0,0.7,1));
         }
         if (this->showGraph.getValue())
         {
@@ -670,6 +692,61 @@ protected:
             vparams->drawTool()->drawLines(points,2.0,defaulttype::Vec4f(1,1,0.5,1));
         }
 
+		if(this->showFaces.getValue())
+		{
+			//Tableau des points du cube
+			std::vector<defaulttype::Vector3> points;
+			points.resize(36);
+			
+			//Tableau des normales de ces faces
+            std::vector<defaulttype::Vector3> normales;
+
+			//Tableau des couleurs des faces
+            std::vector<defaulttype::Vector4> couleurs;
+
+			int tmp[] = {0,1,2, 0,2,3, 0,1,5, 0,5,4, 1,2,6, 1,6,5, 3,2,6, 3,6,7, 0,3,7, 0,7,4, 7,4,5, 7,5,6};
+			int ns1, ns2, ns3;
+            defaulttype::Vector3 s1, s2, s3;
+            for(size_t iH=0;iH<this->hexahedra.getValue().size(); iH++)
+			{
+				sofa::core::topology::Topology::Hexahedron currentCube = hexahedra.getValue().at(iH);
+
+				for(int i=0;i<12; i++)
+				{
+					//Numero du sommet 1
+					ns1 = currentCube.at(tmp[i*3+0]);
+					//Numero du sommet 2
+					ns2 = currentCube.at(tmp[i*3+1]);
+					//Numero du sommet 3
+					ns3 = currentCube.at(tmp[i*3+2]);
+
+
+					s1 = pos[ns1];
+					s2 = pos[ns2];
+					s3 = pos[ns3];
+
+					//Construction des points du cube
+					points.push_back(s1);
+					points.push_back(s2);
+					points.push_back(s3);
+
+					//Calcul de la normale de la surface
+                    defaulttype::Vector3 ab = s2 - s1;
+                    defaulttype::Vector3 ac = s3 - s1;
+                    defaulttype::Vector3 normal = ab.cross(ac);
+					normal.normalize();
+					normales.push_back(normal);		
+
+					//Calcul de la couleur de la face
+					couleurs.push_back(defaulttype::Vec4f(0.7,0,0.7,1));
+
+
+				}
+				
+			}
+			vparams->drawTool()->drawTriangles(points,defaulttype::Vec4f(1,1,1,1));
+		}
+
 #endif /* SOFA_NO_OPENGL */
     }
 #endif
@@ -682,12 +759,12 @@ protected:
     */
     void regularSampling ( const bool atcorners=false , const bool recursive=false )
     {
-        ImageSamplerSpecialization<ImageTypes::label>::regularSampling( this, atcorners, recursive );
+        ImageSamplerSpecialization<ImageTypes>::regularSampling( this, atcorners, recursive );
     }
 
 
     /// subdivide positions indexed in indices in eight sub-lists, add new points in this->position and run recursively
-    void subdivide(vector<unsigned int> &indices)
+    void subdivide(helper::vector<unsigned int> &indices)
     {
         waPositions pos(this->position);
         waEdges g(this->graphEdges);
@@ -707,16 +784,18 @@ protected:
             for(unsigned int i=0; i<nb; i++) {unsigned int index=indices[i]; q.insert(distanceToPoint(pos[index][dir],i));}
             typename distanceSet::iterator it=q.begin();
             BB[0][dir]=q.begin()->first; BB[1][dir]=q.rbegin()->first;
-            C[dir]=(BB[1][dir]+BB[0][dir])*0.5;   while(it->first<C[dir]) it++;       // mean
+            C[dir]=(BB[1][dir]+BB[0][dir])*0.5;   while(it->first<C[dir]) ++it;       // mean
             // for(unsigned int count=0; count<nb/2; count++) it++;   // median
             Real c=it->first;
-            it--; if(C[dir]-it->first<c-C[dir]) c=it->first;
+            --it;
+            if(C[dir]-it->first<c-C[dir]) 
+                c=it->first;
             C[dir]=c;
-            //            std::cout<<"dir="<<dir<<":"; for( it=q.begin(); it!=q.end(); it++)  std::cout<<it->first <<" "; std::cout<<std::endl; std::cout<<"C="<<C[dir]<<std::endl;
+            //            sampler->sout<<"dir="<<dir<<":"; for( it=q.begin(); it!=q.end(); it++)  sampler->sout<<it->first <<" "; sampler->sout<<sampler->sendl; sampler->sout<<"C="<<C[dir]<<sampler->sendl;
         }
-        //        for(unsigned int i=0;i<nb;i++) std::cout<<"("<<pos[indices[i]]<<") ";  std::cout<<std::endl;
+        //        for(unsigned int i=0;i<nb;i++) sampler->sout<<"("<<pos[indices[i]]<<") ";  sampler->sout<<sampler->sendl;
         Coord p;
-        typename vector<Coord>::iterator it;
+        typename helper::vector<Coord>::iterator it;
         // add corners
         unsigned int corners[8]= {addPoint(Coord(BB[0][0],BB[0][1],BB[0][2]),pos,indices),addPoint(Coord(BB[1][0],BB[0][1],BB[0][2]),pos,indices),addPoint(Coord(BB[0][0],BB[1][1],BB[0][2]),pos,indices),addPoint(Coord(BB[1][0],BB[1][1],BB[0][2]),pos,indices),addPoint(Coord(BB[0][0],BB[0][1],BB[1][2]),pos,indices),addPoint(Coord(BB[1][0],BB[0][1],BB[1][2]),pos,indices),addPoint(Coord(BB[0][0],BB[1][1],BB[1][2]),pos,indices),addPoint(Coord(BB[1][0],BB[1][1],BB[1][2]),pos,indices)};
         // add cell center
@@ -749,7 +828,7 @@ protected:
         if(edgs[11]!=corners[3] && edgs[11]!=corners[7]) {addEdge(Edge(corners[3],edgs[11]),g); addEdge(Edge(corners[7],edgs[11]),g);}
 
         // check in which octant lies each point
-        vector<vector<unsigned int> > octant(8); for(unsigned int i=0; i<8; i++)  octant[i].reserve(nb);
+        helper::vector<helper::vector<unsigned int> > octant(8); for(unsigned int i=0; i<8; i++)  octant[i].reserve(nb);
         for(unsigned int i=0; i<indices.size(); i++)
         {
             unsigned int index=indices[i];
@@ -764,16 +843,16 @@ protected:
         }
         for(unsigned int i=0; i<8; i++)
         {
-            // std::cout<<i<<" : "<<octant[i]<<std::endl;
+            // sampler->sout<<i<<" : "<<octant[i]<<sampler->sendl;
             subdivide(octant[i]);
         }
     }
 
     // add point p in pos if not already there are return its index
-    unsigned int addPoint(const Coord p, waPositions& pos, vector<unsigned int> &indices)
+    unsigned int addPoint(const Coord& p, waPositions& pos, helper::vector<unsigned int> &indices)
     {
         unsigned int ret ;
-        typename vector<Coord>::iterator it=std::find(pos.begin(),pos.end(),p);
+        typename helper::vector<Coord>::iterator it=std::find(pos.begin(),pos.end(),p);
         if(it==pos.end()) {ret=pos.size(); indices.push_back(ret); pos.push_back(p); }
         else ret=it-pos.begin();
         return ret;
@@ -783,8 +862,8 @@ protected:
     void addEdge(const Edge e, waEdges& edg)
     {
         if(e[0]==e[1]) return;
-        typename vector<Edge>::iterator it=edg.begin();
-        while(it!=edg.end() && ((*it)[0]!=e[0] || (*it)[1]!=e[1])) it++; // to replace std::find that does not compile here for some reasons..
+        typename helper::vector<Edge>::iterator it=edg.begin();
+        while(it!=edg.end() && ((*it)[0]!=e[0] || (*it)[1]!=e[1])) ++it; // to replace std::find that does not compile here for some reasons..
         if(it==edg.end()) edg.push_back(e);
     }
 
@@ -795,9 +874,9 @@ protected:
     * @param lloydIt : maximum number of Lloyd iterations.
     */
 
-    void uniformSampling (const unsigned int nb=0,  const bool bias=false, const unsigned int lloydIt=100,const bool useDijkstra=false)
+    void uniformSampling (const unsigned int nb=0,  const bool bias=false, const unsigned int lloydIt=100,const unsigned int method=FASTMARCHING, const unsigned int pmmIter=std::numeric_limits<unsigned int>::max(), const SReal pmmTol=10)
     {
-        ImageSamplerSpecialization<ImageTypes::label>::uniformSampling( this, nb, bias, lloydIt, useDijkstra );
+        ImageSamplerSpecialization<ImageTypes>::uniformSampling( this, nb, bias, lloydIt, method, pmmIter, pmmTol );
     }
 
 
@@ -807,9 +886,9 @@ protected:
     * a graph is generated relating the new samples to its neighbors at the instant of insertion
     */
 
-    void recursiveUniformSampling ( const unsigned int nb=0,  const bool bias=false, const unsigned int lloydIt=100,const bool useDijkstra=false,  const unsigned int N=1)
+    void recursiveUniformSampling ( const unsigned int nb=0,  const bool bias=false, const unsigned int lloydIt=100,const unsigned int method=false, const unsigned int N=1, const unsigned int pmmIter=std::numeric_limits<unsigned int>::max(), const SReal pmmTol=10)
     {
-        ImageSamplerSpecialization<ImageTypes::label>::recursiveUniformSampling( this, nb, bias, lloydIt, useDijkstra, N );
+        ImageSamplerSpecialization<ImageTypes>::recursiveUniformSampling( this, nb, bias, lloydIt, method, N, pmmIter, pmmTol );
     }
 
 

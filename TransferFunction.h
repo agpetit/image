@@ -1,23 +1,20 @@
 /******************************************************************************
-*       SOFA, Simulation Open-Framework Architecture, version 1.0 beta 4      *
-*                (c) 2006-2009 MGH, INRIA, USTL, UJF, CNRS                    *
+*       SOFA, Simulation Open-Framework Architecture, development version     *
+*                (c) 2006-2018 INRIA, USTL, UJF, CNRS, MGH                    *
 *                                                                             *
-* This library is free software; you can redistribute it and/or modify it     *
+* This program is free software; you can redistribute it and/or modify it     *
 * under the terms of the GNU Lesser General Public License as published by    *
 * the Free Software Foundation; either version 2.1 of the License, or (at     *
 * your option) any later version.                                             *
 *                                                                             *
-* This library is distributed in the hope that it will be useful, but WITHOUT *
+* This program is distributed in the hope that it will be useful, but WITHOUT *
 * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or       *
 * FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License *
 * for more details.                                                           *
 *                                                                             *
 * You should have received a copy of the GNU Lesser General Public License    *
-* along with this library; if not, write to the Free Software Foundation,     *
-* Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA.          *
+* along with this program. If not, see <http://www.gnu.org/licenses/>.        *
 *******************************************************************************
-*                               SOFA :: Modules                               *
-*                                                                             *
 * Authors: The SOFA Team and external contributors (see Authors.txt)          *
 *                                                                             *
 * Contact information: contact@sofa-framework.org                             *
@@ -25,7 +22,7 @@
 #ifndef SOFA_IMAGE_TRANSFERFUNCTION_H
 #define SOFA_IMAGE_TRANSFERFUNCTION_H
 
-#include "initImage.h"
+#include <image/config.h>
 #include "ImageTypes.h"
 #include <sofa/core/DataEngine.h>
 #include <sofa/core/objectmodel/BaseObject.h>
@@ -33,7 +30,6 @@
 #include <sofa/helper/rmath.h>
 #include <sofa/helper/OptionsGroup.h>
 
-#include <sofa/component/component.h>
 #include <map>
 
 #define LINEAR 0
@@ -46,47 +42,42 @@ namespace component
 namespace engine
 {
 
-using helper::vector;
-using cimg_library::CImg;
-using cimg_library::CImgList;
-
 /**
  * This class transforms pixel intensities
  */
 
 /// Default implementation does not compile
-template <int imageTypeLabel>
+template <class InImageType, class OutImageType>
 struct TransferFunctionSpecialization
 {
 };
 
+/// forward declaration
+template <class InImageType, class OutImageType> class TransferFunction;
 
 /// Specialization for regular Image
-template <>
-struct TransferFunctionSpecialization<defaulttype::IMAGELABEL_IMAGE>
+template <class Ti, class To>
+struct TransferFunctionSpecialization<defaulttype::Image<Ti>,defaulttype::Image<To>>
 {
+    typedef TransferFunction<defaulttype::Image<Ti>,defaulttype::Image<To>> TransferFunctionT;
 
-    template<class TransferFunction>
-    static void update(TransferFunction& This)
+    static void update(TransferFunctionT& This)
     {
-        typedef typename TransferFunction::Ti Ti;
-        typedef typename TransferFunction::To To;
-
-        typename TransferFunction::raParam p(This.param);
-        typename TransferFunction::raImagei in(This.inputImage);
+        typename TransferFunctionT::raParam p(This.param);
+        typename TransferFunctionT::raImagei in(This.inputImage);
         if(in->isEmpty()) return;
-        const CImgList<Ti>& inimg = in->getCImgList();
+        const cimg_library::CImgList<Ti>& inimg = in->getCImgList();
 
-        typename TransferFunction::waImageo out(This.outputImage);
-        typename TransferFunction::imCoord dim=in->getDimensions();
+        typename TransferFunctionT::waImageo out(This.outputImage);
+        typename TransferFunctionT::imCoord dim=in->getDimensions();
         out->setDimensions(dim);
-        CImgList<To>& img = out->getCImgList();
+        cimg_library::CImgList<To>& img = out->getCImgList();
 
         switch(This.filter.getValue().getSelectedId())
         {
         case LINEAR:
         {
-            typename TransferFunction::iomap mp; for(unsigned int i=0; i<p.size(); i+=2) mp[(Ti)p[i]]=(To)p[i+1];
+            typename TransferFunctionT::iomap mp; for(unsigned int i=0; i<p.size(); i+=2) mp[(Ti)p[i]]=(To)p[i+1];
             cimglist_for(inimg,l) cimg_forXYZC(inimg(l),x,y,z,c) img(l)(x,y,z,c)=This.Linear_TransferFunction(inimg(l)(x,y,z,c),mp);
         }
             break;
@@ -100,12 +91,13 @@ struct TransferFunctionSpecialization<defaulttype::IMAGELABEL_IMAGE>
 };
 
 
-
+/**
+ * \todo adjust type of ParamTypes according to InImageTypes and OutImageTypes
+ */
 template <class _InImageTypes,class _OutImageTypes>
 class TransferFunction : public core::DataEngine
 {
-    friend struct TransferFunctionSpecialization<defaulttype::IMAGELABEL_IMAGE>;
-    friend struct TransferFunctionSpecialization<defaulttype::IMAGELABEL_BRANCHINGIMAGE>;
+    friend struct TransferFunctionSpecialization<_InImageTypes,_OutImageTypes>;
 
 public:
     typedef core::DataEngine Inherited;
@@ -114,30 +106,28 @@ public:
     typedef _InImageTypes InImageTypes;
     typedef typename InImageTypes::T Ti;
     typedef typename InImageTypes::imCoord imCoord;
-    typedef helper::WriteAccessor<Data< InImageTypes > > waImagei;
     typedef helper::ReadAccessor<Data< InImageTypes > > raImagei;
 
     typedef _OutImageTypes OutImageTypes;
     typedef typename OutImageTypes::T To;
-    typedef helper::WriteAccessor<Data< OutImageTypes > > waImageo;
-    typedef helper::ReadAccessor<Data< OutImageTypes > > raImageo;
+    typedef helper::WriteOnlyAccessor<Data< OutImageTypes > > waImageo;
 
     typedef std::map<Ti,To> iomap;
     typedef typename iomap::const_iterator iomapit;
 
 
-    typedef vector<double> ParamTypes;
-    typedef helper::WriteAccessor<Data< ParamTypes > > waParam;
+    typedef helper::vector<double> ParamTypes;
+    typedef helper::WriteOnlyAccessor<Data< ParamTypes > > waParam;
     typedef helper::ReadAccessor<Data< ParamTypes > > raParam;
 
-    Data<helper::OptionsGroup> filter;
-    Data< ParamTypes > param;
+    Data<helper::OptionsGroup> filter; ///< Filter
+    Data< ParamTypes > param; ///< Parameters
 
     Data< InImageTypes > inputImage;
 
     Data< OutImageTypes > outputImage;
 
-    virtual std::string getTemplateName() const    { return templateName(this);    }
+    virtual std::string getTemplateName() const    override { return templateName(this);    }
     static std::string templateName(const TransferFunction<InImageTypes,OutImageTypes>* = NULL) { return InImageTypes::Name()+std::string(",")+OutImageTypes::Name(); }
 
     TransferFunction()    :   Inherited()
@@ -156,22 +146,21 @@ public:
 
     virtual ~TransferFunction() {}
 
-    virtual void init()
+    virtual void init() override
     {
         addInput(&inputImage);
         addOutput(&outputImage);
         setDirtyValue();
     }
 
-    virtual void reinit() { update(); }
+    virtual void reinit() override { update(); }
 
 protected:
 
-    virtual void update()
+    virtual void update() override
     {
+        TransferFunctionSpecialization<InImageTypes,OutImageTypes>::update( *this );
         cleanDirty();
-
-        TransferFunctionSpecialization<InImageTypes::label>::update( *this );
     }
 
 

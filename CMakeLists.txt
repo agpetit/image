@@ -1,167 +1,203 @@
-include(${SOFA_CMAKE_DIR}/preProject.cmake)
+add_subdirectory(extlibs/DiffusionSolver)
 
+cmake_minimum_required(VERSION 3.1)
+project(image)
+
+set(IMAGE_MAJOR_VERSION 0)
+set(IMAGE_MINOR_VERSION 1)
+set(IMAGE_VERSION ${IMAGE_MAJOR_VERSION}.${IMAGE_MINOR_VERSION})
 
 set(SOURCE_FILES
-    initImage.cpp
+    CollisionToCarvingEngine.cpp
+    DepthMapToMeshEngine.cpp
+    ImageAccumulator.cpp
     ImageContainer.cpp
+    GenerateImage.cpp
+    ImageDataDisplay.cpp
+    ImageExporter.cpp
     ImageFilter.cpp
     ImageOperation.cpp
-    ImageTransform.cpp
-    TransferFunction.cpp
-    ImageValuesFromPositions.cpp
-    MergeImages.cpp
-    ImageAccumulator.cpp
-    DepthMapToMeshEngine.cpp
-    MeshToImageEngine.cpp
-    MarchingCubesEngine.cpp 
     ImageSampler.cpp
-    ImageExporter.cpp 
-    ImageDataDisplay.cpp
+    ImageToRigidMassEngine.cpp
+    ImageTransform.cpp
+    ImageTransformEngine.cpp
+    ImageTypes.cpp
+    ImageValuesFromPositions.cpp
+    ImageCoordValuesFromPositions.cpp
+    MarchingCubesEngine.cpp
+    MergeImages.cpp
+    MeshToImageEngine.cpp
+    TransferFunction.cpp
     VoronoiToMeshEngine.cpp
-	OpenniCam.cpp
-	Openni2Cam.cpp
-
+    initImage.cpp
 )
 
 set(HEADER_FILES
-    initImage.h
-    ImageTypes.h
+    CollisionToCarvingEngine.h
+    Containers.h
+    DepthMapToMeshEngine.h
+    ImageAccumulator.h
+    ImageAlgorithms.h
     ImageContainer.h
+    GenerateImage.h
+    ImageDataDisplay.h
+    ImageExporter.h
     ImageFilter.h
     ImageOperation.h
-    ImageTransform.h
-    TransferFunction.h
-    ImageValuesFromPositions.h
-    MergeImages.h
-    ImageAccumulator.h
-    DepthMapToMeshEngine.h
-    MeshToImageEngine.h
-    MarchingCubesEngine.h
     ImageSampler.h
-    ImageExporter.h
-    VectorVis.h 
-    ImageAlgorithms.h 
-    Containers.h 
-    ImageDataDisplay.h
+    ImageToRigidMassEngine.h
+    ImageTransform.h
+    ImageTransformEngine.h
+    ImageTypes.h
+    ImageValuesFromPositions.h
+    ImageCoordValuesFromPositions.h
+    MarchingCubesEngine.h
+    MergeImages.h
+    MeshToImageEngine.h
+    TransferFunction.h
+    VectorVis.h
     VoronoiToMeshEngine.h
-	OpenniCam.h
-	Openni2Cam.h
-
 )
+
 
 set(README_FILES image.txt)
 
-find_package(PCL REQUIRED)
-link_directories(${PCL_LIBRARY_DIRS})
-include_directories(BEFORE ${PCL_INCLUDE_DIRS})
-add_definitions(${PCL_DEFINITIONS})
 
-# find the DepthSense SDK
-list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/cmake)
-find_package(DepthSenseSDK)
+find_package(SofaPython QUIET)
+if( SofaPython_FOUND )
 
-if(NOT DepthSenseSDK_FOUND)
-  message(FATAL_ERROR "+++++++++ Could not locate the DepthSense SDK +++++++++
-Please install the SDK before trying to build the 'softkinetic_camera' package, see README.txt.
+    set(PYTHON_FILES
+        python/SofaImage/API.py
+        python/SofaImage/__init__.py
+    )
 
-Cannot continue, aborting.")
-  return()
+    list(APPEND SOURCE_FILES python/Binding_ImageData.cpp)
+    list(APPEND HEADER_FILES python/Binding_ImageData.h python/Binding_ImageData.inl)
 endif()
 
-find_package(Boost COMPONENTS system filesystem thread REQUIRED)
+find_package(SofaBase REQUIRED)
+find_package(SofaGeneral REQUIRED)
+find_package(Newmat REQUIRED)
+find_package(CImgPlugin REQUIRED)
 
-find_package(PkgConfig)
-pkg_check_modules(PC_LIBOPENNI REQUIRED libopenni)
-pkg_check_modules(PC_LIBUSB REQUIRED libusb-1.0)
-add_definitions(${PC_LIBOPENNI_CFLAGS_OTHER})
+configure_file(config.h.in "${CMAKE_BINARY_DIR}/include/image/config.h")
+install(FILES "${CMAKE_BINARY_DIR}/include/image/config.h" DESTINATION "include/image")
 
-#generate_dynamic_reconfigure_options(cfg/OpenNI.cfg)
-
-
-find_package(OpenCV REQUIRED)
-find_package(CUDA)
-IF(CUDA_FOUND)
-  MESSAGE(STATUS "CUDA found")
-  SET(HAVE_CUDA  FALSE)
-  SET(HAVE_CUDA_FOUND "yes")
-ELSE(CUDA_FOUND)
-  MESSAGE(STATUS "CUDA not found")
-  SET(HAVE_CUDA_FOUND "no") 
-ENDIF(CUDA_FOUND)
-
-FIND_PACKAGE(VISP)
-IF(VISP_FOUND)
-  INCLUDE(${VISP_USE_FILE})
-ENDIF(VISP_FOUND)
-LINK_DIRECTORIES(${VISP_LINK_DIRECTORIES})
-
-FIND_PACKAGE(Lua51)
-IF(NOT LUA51_FOUND)
-    MESSAGE(CRITICAL Lua not found!)
-ENDIF(NOT LUA51_FOUND)
-
-find_package(Eigen3 REQUIRED)
-
-set(${PROJECT_NAME}_INCLUDE_EXPORTS
-  ${OpenCV_INCLUDE_DIRS}
-  ${VISP_INCLUDE_DIR}
-  ${LUA_INCLUDE_DIR}
-  include
-  /usr/local/cuda-6.0/include/
-  /usr/local/cuda-6.0/samples/common/inc/
-  /usr/local/cuda-6.0/samples/7_CUDALibraries/common/UtilNPP/
-  ${DepthSenseSDK_INCLUDE_DIRS}
-  /usr/include/pcl-1.7/
-    /usr/include/pcl-1.8/
-    ${EIGEN_INCLUDE_DIRS}
-    ${PCL_INCLUDE_DIRS}
-	${PC_LIBOPENNI_INCLUDE_DIRS} 
-	${Boost_INCLUDE_DIRS} 
-)
-
-include_directories(
-${PROJECT_NAME}_INCLUDE_EXPORTS
-${DepthSenseSDK_INCLUDE_DIRS}
-
-)
-
-
-set(ALL_LIBRARIES ${OpenCV_LIBS} freeimage ${LUA_LIBRARIES} ${FREEGLUT_LIBRARY} ${GLEW_LIBRARY} 
-${OPENGL_LIBRARIES} ${CUDA_LIBRARY} ${CUDA_npp_LIBRARY} ${PCL_LIBRARIES} 
-${DepthSenseSDK_LIBRARIES} ${EIGEN_LIBRARIES}                                     
-${Boost_LIBRARIES} ${PC_LIBOPENNI_LIBRARIES} ${PC_LIBUSB_LIBRARIES})
-
-if (NOT SOFA-MISC_NO_OPENGL)
-    list(APPEND HEADER_FILES "ImageViewer.h")
-    list(APPEND SOURCE_FILES "ImageViewer.cpp")
+if( SofaPython_FOUND )
+    # Config files and install rules for pythons scripts
+    sofa_set_python_directory(${PROJECT_NAME} "python")
 endif()
 
-if(SOFA-EXTERNAL_LIBFREENECT)
-    list(APPEND HEADER_FILES "Kinect.h")
-    list(APPEND SOURCE_FILES "Kinect.cpp")
-    AddLinkerDependencies("freenect")
-    AddLinkerDependencies("freenect_sync")
+if(NOT ${SOFA_NO_OPENGL})
+    list(APPEND HEADER_FILES ImageViewer.h)
+    list(APPEND SOURCE_FILES ImageViewer.cpp)
 endif()
 
-if(SOFA-EXTERNAL_ZLIB)
-    AddLinkerDependencies(${ZLIB_LIBRARIES})
+list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR})
+find_package(Freenect QUIET)
+
+#if(FREENECT_FOUND)
+#    list(APPEND HEADER_FILES Kinect.h)
+#    list(APPEND SOURCE_FILES Kinect.cpp)
+#    message(STATUS "image: found the freenect library")
+#else()
+#    message(STATUS "image: could not find the freenect library, won't build the Kinect component")
+#endif()
+
+
+find_package(OpenCV)
+find_package(realsense2)
+if(realsense2_FOUND)
+    list(APPEND HEADER_FILES RealSenseCam.h)
+    list(APPEND SOURCE_FILES RealSenseCam.cpp)
+    message(STATUS "image: found the realsense library")
+else()
+    message(STATUS "image: could not find the realsense library, won't build the realsense component")
 endif()
 
-add_library(${PROJECT_NAME} SHARED ${HEADER_FILES} ${MOC_FILES} ${SOURCE_FILES} ${README_FILES})
+# if(SOFA-EXTERNAL_OPENCV)
+# AddLinkerDependencies("ml")
+# AddLinkerDependencies("cvaux")
+# AddLinkerDependencies("highgui")
+# AddLinkerDependencies("cv")
+# AddLinkerDependencies("cxcore")
+# endif()
 
-AddCompilerDefinitions("SOFA_BUILD_IMAGE")
-AddLinkerDependencies(SofaBaseVisual ${ALL_LIBRARIES})
-# AddLinkerDependencies(${OPENGL_LIBRARIES})
-
-if(SOFA-EXTERNAL_OPENCV)
-    AddLinkerDependencies("ml")
-    AddLinkerDependencies("cvaux")
-    AddLinkerDependencies("highgui")
-    AddLinkerDependencies("cv")
-    AddLinkerDependencies("cxcore")
+# OpenMP is bugged in image, forcing it to be single threaded for now
+if(SOFA_OPENMP)
+    message( WARNING "image: deactivating OpenMP" )
+    string(REPLACE "${OpenMP_CXX_FLAGS}" "" CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS})
+    string(REPLACE "${OpenMP_CXX_FLAGS}" "" CMAKE_CXX_LINK_FLAGS ${CMAKE_CXX_LINK_FLAGS})
 endif()
 
-AddLinkerDependencies(newmat)
+find_package(DiffusionSolver CONFIG REQUIRED)
+
+add_library(${PROJECT_NAME} SHARED ${HEADER_FILES} ${SOURCE_FILES} ${README_FILES} ${PYTHON_FILES})
+target_link_libraries(${PROJECT_NAME} SofaCore SofaComponentBase SofaGeneralVisual CImgPlugin)
+target_link_libraries(${PROJECT_NAME} DiffusionSolver)
+target_link_libraries(${PROJECT_NAME} newmat)
+
+if(FREENECT_FOUND)
+    target_link_libraries(${PROJECT_NAME} freenect)
+    target_link_libraries(${PROJECT_NAME} freenect_sync)
+endif()
+
+if(OPENCV_FOUND)
+    target_link_libraries(${PROJECT_NAME} ${OpenCV_LIBS})
+endif()
+
+if(realsense2_FOUND)
+link_directories(${realsense2_LIBRARY})
+target_link_libraries(${PROJECT_NAME} ${realsense2_LIBRARY})
+endif()
+
+target_include_directories(${PROJECT_NAME} PUBLIC "$<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/include>")
+target_include_directories(${PROJECT_NAME} PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/..>")
+target_include_directories(${PROJECT_NAME} PUBLIC "$<BUILD_INTERFACE:${CImgPlugin_INCLUDE_DIRS}>")
+target_include_directories(${PROJECT_NAME} PUBLIC "$<INSTALL_INTERFACE:include>")
+if(FREENECT_FOUND)
+    target_include_directories(${PROJECT_NAME} PUBLIC "${FREENECT_INCLUDE_DIR}")
+endif()
+set_target_properties(${PROJECT_NAME} PROPERTIES VERSION ${IMAGE_VERSION})
+set_target_properties(${PROJECT_NAME} PROPERTIES PUBLIC_HEADER "${HEADER_FILES}")
+
+if(OPENCV_FOUND)
+    target_include_directories(${PROJECT_NAME} PUBLIC "${OpenCV_INCLUDE_DIRS}")
+endif()
+
+if(realsense2_FOUND)
+    target_include_directories(${PROJECT_NAME} PUBLIC "${realsense_INCLUDE_DIR}")
+endif()
+
+set(IMAGE_COMPILER_FLAGS "-DSOFA_BUILD_IMAGE")
 
 
-include(${SOFA_CMAKE_DIR}/postProject.cmake)
+if( SofaPython_FOUND )
+    target_link_libraries(${PROJECT_NAME} SofaPython)    
+    set(IMAGE_COMPILER_FLAGS "${IMAGE_COMPILER_FLAGS} -DSOFA_HAVE_SOFAPYTHON")
+endif()
+
+if(SOFA_HAVE_ZLIB)
+    target_link_libraries(${PROJECT_NAME} SofaFramework::ZLIB)
+endif()
+
+if(SOFA_BUILD_TESTS)
+    find_package(SofaTest QUIET)
+    if(SofaTest_FOUND)
+        add_subdirectory(image_test)
+    endif()
+endif()
+
+
+set_target_properties(${PROJECT_NAME} PROPERTIES COMPILE_FLAGS "${IMAGE_COMPILER_FLAGS}")
+
+find_package(SofaGui QUIET)
+if(SofaGui_FOUND AND SOFA_GUI_QT)
+    add_subdirectory(image_gui)
+endif()
+
+## Install rules for the library and headers; CMake package configurations files
+sofa_create_package(image ${IMAGE_VERSION} ${PROJECT_NAME} image)
+
+## Install rules for the resources
+install(DIRECTORY examples/ DESTINATION share/sofa/plugins/${PROJECT_NAME})

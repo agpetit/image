@@ -1,23 +1,20 @@
 /******************************************************************************
-*       SOFA, Simulation Open-Framework Architecture, version 1.0 beta 4      *
-*                (c) 2006-2009 MGH, INRIA, USTL, UJF, CNRS                    *
+*       SOFA, Simulation Open-Framework Architecture, development version     *
+*                (c) 2006-2018 INRIA, USTL, UJF, CNRS, MGH                    *
 *                                                                             *
-* This library is free software; you can redistribute it and/or modify it     *
+* This program is free software; you can redistribute it and/or modify it     *
 * under the terms of the GNU Lesser General Public License as published by    *
 * the Free Software Foundation; either version 2.1 of the License, or (at     *
 * your option) any later version.                                             *
 *                                                                             *
-* This library is distributed in the hope that it will be useful, but WITHOUT *
+* This program is distributed in the hope that it will be useful, but WITHOUT *
 * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or       *
 * FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License *
 * for more details.                                                           *
 *                                                                             *
 * You should have received a copy of the GNU Lesser General Public License    *
-* along with this library; if not, write to the Free Software Foundation,     *
-* Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA.          *
+* along with this program. If not, see <http://www.gnu.org/licenses/>.        *
 *******************************************************************************
-*                               SOFA :: Modules                               *
-*                                                                             *
 * Authors: The SOFA Team and external contributors (see Authors.txt)          *
 *                                                                             *
 * Contact information: contact@sofa-framework.org                             *
@@ -25,15 +22,14 @@
 #ifndef SOFA_IMAGE_AVERAGECATCHALLVECTOR_H
 #define SOFA_IMAGE_AVERAGECATCHALLVECTOR_H
 
-#include "initImage_gui.h"
+#include <image/image_gui/config.h>
 #include <sofa/core/DataEngine.h>
 #include <sofa/core/objectmodel/BaseObject.h>
 #include <sofa/defaulttype/Vec.h>
 
-#include <sofa/component/component.h>
 #include <sofa/helper/OptionsGroup.h>
 
-#include "ImageContainer.h"
+#include <image/ImageContainer.h>
 
 namespace sofa
 {
@@ -62,19 +58,19 @@ public:
 
     ~AverageCatchAllVector() {}
 
-    void init()
+    void init() override
     {
         reinit();
     }
 
-    void reinit()
+    void reinit() override
     {
-        vector<Type> data;
-        const vector<Type> &data1 = _data1.getValue();
-        const vector<Type> &data2 = _data2.getValue();
+        helper::vector<Type> data;
+        const helper::vector<Type> &data1 = _data1.getValue();
+        const helper::vector<Type> &data2 = _data2.getValue();
 
 
-        for(int i=0;i<data1.size();i++)
+        for(size_t i=0;i<data1.size();i++)
         {
             data.push_back((data1[i]+data2[i])/2);
         }
@@ -83,13 +79,13 @@ public:
 
     }
 
-    Data< vector<Type> > _data;
-    Data< vector<Type> > _data1;
-    Data< vector<Type> > _data2;
+    Data< helper::vector<Type> > _data; ///< data_out
+    Data< helper::vector<Type> > _data1; ///< data_in1
+    Data< helper::vector<Type> > _data2; ///< data_in2
 
 protected:
 
-    virtual void update()
+    virtual void update() override
     {
     }
 

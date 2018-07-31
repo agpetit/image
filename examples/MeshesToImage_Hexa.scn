@@ -10,16 +10,16 @@
   <MeshObjLoader name="mesh3" filename="mesh/bubille_out.obj" triangulate="1"/>
 
     <MeshToImageEngine template="ImageD" name="rasterizer"  nbMeshes="3"   
-                       value="100" position="@mesh3.position" triangles="@mesh3.triangles"   
-                       value2="10" position2="@mesh2.position" triangles2="@mesh2.triangles"   
-                       value3="1000" position3="@mesh1.position" triangles3="@mesh1.triangles"   
+                       value="100" insideValue="100" position="@mesh3.position" triangles="@mesh3.triangles"
+                       value2="10" insideValue2="10" position2="@mesh2.position" triangles2="@mesh2.triangles"
+                       value3="1000" insideValue3="1000"  position3="@mesh1.position" triangles3="@mesh1.triangles"
                        voxelSize="1.5 1.5 1.5" padSize="2" rotateImage="false" printLog="true"/>
     <ImageContainer template="ImageD" name="image" src="@rasterizer" drawBB="false"/>
 
 
   <Node name="flexible" >
-    	    <EulerImplicitSolver />
-    	    <CGLinearSolver iterations="25"/>
+    	    <EulerImplicitSolver  rayleighStiffness="0.1" rayleighMass="0.1" />
+    	    <CGLinearSolver iterations="25" tolerance="1E-5" threshold="1E-5"/>
 
 	    <ImageSampler template="ImageD" name="sampler" src="@../image" param="1" showEdges="false" /> 
 	    <Mesh name="mesh" src="@sampler" />
@@ -29,14 +29,14 @@
 	    <BarycentricShapeFunction  nbRef="8" />
 
 	    <Node 	name="behavior"   >
-		<TopologyGaussPointSampler name="sampler" inPosition="@../mesh.position" showSamples="false" method="0" order="2" />
+		<TopologyGaussPointSampler name="sampler" inPosition="@../mesh.position" method="0" order="2" />
 		<MechanicalObject template="F331" />
-	    	<LinearMapping template="Mapping&lt;Vec3d,F331&gt;" />
+	    	<LinearMapping template="Vec3d,F331" />
 
 		<Node 	name="E"   >
     		    <ImageValuesFromPositions name="youngM" position="@../sampler.position" src="@../../../image" />
 		    <MechanicalObject  template="E331" /> 
-		    <CorotationalStrainMapping template="Mapping&lt;F331,E331&gt;" />
+		    <CorotationalStrainMapping template="F331,E331" />
 		    <HookeForceField  template="E331" youngModulus="@youngM.values" poissonRatio="0" viscosity="0"/> 
 		</Node>
 	    </Node>
@@ -44,17 +44,17 @@
 
 		<Node name="Gelatin-Visu">
 			<VisualModel name="Gelatin" fileMesh="mesh/bubille_8x8x16.obj" color="0.1 .8 .3 .6" />
-			<LinearMapping template="MechanicalMapping&lt;Vec,ExtVec3f&gt;"/>
+			<LinearMapping template="Vec3d,ExtVec3f"/>
 		</Node>
 
 		<Node name="Ball1-Visu">
 			<VisualModel name="Ball1" fileMesh="mesh/bubille_in1.obj" color="1 0 0 1" />
-			<LinearMapping template="MechanicalMapping&lt;Vec,ExtVec3f&gt;"/>
+			<LinearMapping template="Vec3d,ExtVec3f"/>
 		</Node>
 
 		<Node name="Ball2-Visu">
 			<VisualModel name="Ball2" fileMesh="mesh/bubille_in2.obj" color="0 0 1 1" />
-			<LinearMapping template="MechanicalMapping&lt;Vec,ExtVec3f&gt;"/>
+			<LinearMapping template="Vec3d,ExtVec3f"/>
 		</Node>
 
 	 	<Node name="VisuHexa_wireframe"  >
@@ -66,8 +66,8 @@
 		<Node name="Collision">
 			<MeshObjLoader name="MeshLoader" filename="mesh/bubille_out.obj"/>
 			<Mesh src="@MeshLoader" /> 
-			<MechanicalObject useMask="1" />
-		    	<LinearMapping template="MechanicalMapping&lt;Vec,Vec3d&gt;"/>
+			<MechanicalObject  />
+		    	<LinearMapping template="Vec3d,Vec3d"/>
 		</Node>
     </Node>
 

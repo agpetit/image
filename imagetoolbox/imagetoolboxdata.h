@@ -2,9 +2,9 @@
 #define IMAGETOOLBOXDATA_H
 
 #include "labelimagetoolbox.h"
-#include "ImageTypes.h"
+#include <image/ImageTypes.h>
 
-#include "initImage_gui.h"
+#include <image/image_gui/config.h>
 
 namespace sofa
 {
@@ -76,7 +76,7 @@ public:
     {
         if(this->mergeChannels==_mergeChannels) return;
         this->mergeChannels=_mergeChannels;
-        this->setClamp(Vec<2,T>(cimg::type<T>::min(),cimg::type<T>::max()));
+        this->setClamp(Vec<2,T>(cimg_library::cimg::type<T>::min(),cimg_library::cimg::type<T>::max()));
         this->update();
     }
     
