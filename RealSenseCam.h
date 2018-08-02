@@ -117,6 +117,7 @@ public:
     Data<int> depthMode;
     Data<bool> drawBB;
     Data<float> showArrowSize;
+    Data<int> depthScale;
 	
 cv::Mat_<cv::Vec3f> points3d;
 
@@ -272,7 +273,7 @@ void acquireAligned()
 
     cv::Mat depth160( heightd, widthd, CV_16U, (void*)depth.get_data() );
 
-    depth160.convertTo(depth32, CV_32F,(float)1/8190);
+    depth160.convertTo(depth32, CV_32F,(float)1/8190*depthScale.getValue());
     // Read the color buffer and display
     int32_t w, h, w_depth, h_depth;
 
@@ -398,10 +399,10 @@ RealSenseCam::RealSenseCam() : Inherited()
         , depthTransform(initData(&depthTransform, TransformType(), "depthTransform" , ""))
         , imageO(initData(&imageO,ImageTypes(),"image","image"))
         , transform(initData(&transform, TransformType(), "transform" , ""))
-        , resolution ( initData ( &resolution,"resolution","resolution" ) )
-        , depthMode ( initData ( &depthMode,1,"depthMode","depth mode" ) )
+        , resolution ( initData ( &resolution,"resolution","resolution" ))
+        , depthMode ( initData ( &depthMode,1,"depthMode","depth mode" ))
         , drawBB(initData(&drawBB,false,"drawBB","draw bounding box"))
-        , showArrowSize(initData(&showArrowSize,0.1f,"showArrowSize","size of the axis"))
+        , depthScale(initData(&depthScale,1,"depthScale","scale for the depth values, 1 for SR300, 10 for 435"))
     {
 
     globalRealSenseCamClassPointer = (void*) this;
