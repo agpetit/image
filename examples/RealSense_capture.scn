@@ -1,5 +1,5 @@
 <?xml version="1.0"?>
 <Node 	name="root" gravity="0 0 0" dt="0.03"  >
   <RequiredPlugin name="image"/>
-  <RealSenseCam  name="rsCam" transform="0 0 0 0 0 0 .001 .001 1 0 1 1" depthTransform="0 0 0 0 0 0 .001 .001 1 0 1 1" tiltAngle="0"/>
+  <RealSenseCam  name="rsCam" transform="0 0 0 0 0 0 .001 .001 1 0 1 1" depthTransform="0 0 0 0 0 0 .001 .001 1 0 1 1" tiltAngle="0" depthScale="10" depthMode="1"/>
 </Node>
