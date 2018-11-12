@@ -40,6 +40,14 @@
 #include <sofa/defaulttype/Quat.h>
 #include <sofa/helper/rmath.h>
 #include <sofa/helper/OptionsGroup.h>
+#include <sofa/helper/gl/Color.h>
+
+#define GL_GLEXT_PROTOTYPES 1
+#define GL4_PROTOTYPES 1
+#include <GL/glew.h>
+#include <GL/freeglut.h>
+#include <GL/glext.h>
+#include <GL/glu.h>
 
 #include <librealsense2/rs.hpp>
 #include <opencv2/opencv.hpp>
@@ -118,21 +126,17 @@ public:
     Data<bool> drawBB;
     Data<float> showArrowSize;
     Data<int> depthScale;
-	
-cv::Mat_<cv::Vec3f> points3d;
 
-int niterations;
+    int widthc, heightc;
+    int widthd, heightd;
 
 // Declare depth colorizer for pretty visualization of depth data
 rs2::colorizer color_map;
+CImg<T> img,depthimg;
 
 // Declare RealSense pipeline, encapsulating the actual device and sensors
 rs2::pipeline pipe;
 // Start streaming with default recommended configuration
-
-
-// Using the context to create a rs2::align object.
-// rs2::align allows you to perform aliment of depth frames to others
 
 public:
 
@@ -143,11 +147,9 @@ virtual ~RealSenseCam();
 virtual std::string getTemplateName() const	{ return templateName(this); }
 static std::string templateName(const RealSenseCam* = NULL) {	return std::string(); }
 
-
 virtual void init();
 void initRaw();
 void initAlign();
-
 
 protected:
 
@@ -155,7 +157,6 @@ void acquireRaw()
 {
 
     rs2::frameset data;
-
     data = pipe.wait_for_frames(); // Wait for next set of frames from the camera
 
     // Trying to get both color and depth frames
@@ -164,8 +165,6 @@ void acquireRaw()
 
     // Create depth image
     if (depth && color){
-
-     int widthd, heightd, widthc, heightc;
 
      widthc = color.get_width();
      heightc = color.get_height();
@@ -179,54 +178,34 @@ void acquireRaw()
 
      cv::Mat depth160( heightd, widthd, CV_16U, (void*)depth.get_data() );
      depth16=depth160.clone();
-
      depth16.convertTo(depth32, CV_32F,(float)1/8190);
 
      widthc = color.get_width();
      heightc = color.get_height();
 
-    //std::cout << " widthc " << widthc << " heigthc " << heightc << std::endl;
-    //std::cout << " widthd " << widthd << " heigthd " << heightd << std::endl;
-
-     //depth8u = depth16;
-     //depth8u.convertTo( depth8u, CV_8UC1, 255.0/1000);
-
-
-    // Read the color buffer and display
-    int32_t w, h, w_depth, h_depth;
-
-    w = widthc;
-    h = heightc;
-    w_depth = widthd;
-    h_depth = heightd;
     waImage wimage(this->imageO);
-    CImg<T>& img =wimage->getCImg(0);
-    //img.resize(widthc,heightc,1,3);
+    img =wimage->getCImg(0);
 
     waDepth wdepth(this->depthImage);
     waTransform wdt(this->depthTransform);
-    CImg<dT>& depthimg =wdepth->getCImg(0);
-    //depthimg.resize(widthd,heightd,1,1);
+    depthimg =wdepth->getCImg(0);
 
     cv::Mat bgr_image;
     cvtColor (rgb0, bgr_image, CV_RGB2BGR);
 
             if(img.spectrum()==3)
             {
-            unsigned char* rgb0 = (unsigned char*)bgr_image.data;
-            //unsigned char* rgb0 = (unsigned char*)color.get_data();
+            unsigned char* rgb = (unsigned char*)color.get_data();
             unsigned char *ptr_r = img.data(0,0,0,2), *ptr_g = img.data(0,0,0,1), *ptr_b = img.data(0,0,0,0);
-            for ( int siz = 0 ; siz<img.width()*img.height(); siz++)    { *(ptr_r++) = *(rgb0++); *(ptr_g++) = *(rgb0++); *(ptr_b++) = *(rgb0++);
-                        }
+                for ( int siz = 0 ; siz<widthc*heightc; siz++)
+                {
+                    *(ptr_r++) = *(rgb++);
+                    *(ptr_g++) = *(rgb++);
+                    *(ptr_b++) = *(rgb++);
+                }
             }
-            else memcpy(img.data(),  bgr_image.data, img.width()*img.height()*sizeof(T));
 
-    waImage wimage1(this->imageO);
-    CImg<T>& img1 =wimage1->getCImg(0);
-
-    memcpy(depthimg.data(), (float*)depth32.data , w_depth*h_depth*sizeof(float));
-
-    std::cout << " ok acquire raw " << std::endl;
+    memcpy(depthimg.data(), (float*)depth32.data , widthd*heightd*sizeof(float));
 
 }
 
@@ -235,10 +214,7 @@ void acquireRaw()
 void acquireAligned()
 {
     rs2::align align(RS2_STREAM_COLOR);
-
     rs2::frameset frameset;
-
-    //double timeAcq0 = (double)getTickCount();
 
     while (!frameset.first_or_default(RS2_STREAM_DEPTH) || !frameset.first_or_default(RS2_STREAM_COLOR))
     {
@@ -247,25 +223,17 @@ void acquireAligned()
 
     auto processed = align.process(frameset);
 
-   //double timeAcq1 = (double)getTickCount();
-   //cout <<"time process frames " << (timeAcq1 - timeAcq0)/getTickFrequency() << endl;
    // Trying to get both color and aligned depth frames
     rs2::video_frame color = processed.get_color_frame();
     rs2::depth_frame depth = processed.get_depth_frame();
 
     if (depth && color)
     {
-    double timePCD = (double)getTickCount();
-
-
-    int widthd, heightd, widthc, heightc;
 
     widthc = color.get_width();
     heightc = color.get_height();
 
-    cv::Mat rgb0(heightc,widthc, CV_8UC3, (void*) color.get_data());
     cv::Mat depth16, depth32,depth8u;
-    //cv::imwrite("rgb12.png", rgb0);
 
     // Create depth image
     widthd = depth.get_width();
@@ -275,44 +243,25 @@ void acquireAligned()
 
     depth160.convertTo(depth32, CV_32F,(float)1/8190*depthScale.getValue());
     // Read the color buffer and display
-    int32_t w, h, w_depth, h_depth;
-
-    w = widthc;
-    h = heightc;
-    w_depth = widthd;
-    h_depth = heightd;
 
     waImage wimage(this->imageO);
-    CImg<T>& img =wimage->getCImg(0);
-    img.resize(widthc,heightc,1,3);
+    img = wimage->getCImg(0);
 
     waDepth wdepth(this->depthImage);
-    waTransform wdt(this->depthTransform);
-    CImg<dT>& depthimg =wdepth->getCImg(0);
-    depthimg.resize(widthd,heightd,1,1);
-
-    //cv::Mat bgr_image;
-    //cvtColor (rgb0, bgr_image, CV_RGB2BGR);
-
-    /*depth160.convertTo( depth8u, CV_8UC1, 255.0/1000 );
-    cv::imwrite("bgr0.png", depth8u);*/
+    //depthimg =wdepth->getCImg(0);
 
         if(img.spectrum()==3)
         {
-        //unsigned char* rgb0 = (unsigned char*)bgr_image.data;
-        //unsigned char* rgb = (unsigned char*)color.get_data();
-        unsigned char* rgb1 = (unsigned char*)rgb0.data;
+        unsigned char* rgb = (unsigned char*)color.get_data();
         unsigned char *ptr_b = img.data(0,0,0,2), *ptr_g = img.data(0,0,0,1), *ptr_r = img.data(0,0,0,0);
-        for ( int siz = 0 ; siz<img.width()*img.height(); siz++)    { *(ptr_r++) = *(rgb1++); *(ptr_g++) = *(rgb1++); *(ptr_b++) = *(rgb1++);
-                    }
+            for ( int siz = 0 ; siz<widthc*heightc; siz++)
+            {
+                *(ptr_r++) = *(rgb++);
+                *(ptr_g++) = *(rgb++);
+                *(ptr_b++) = *(rgb++);
+            }
         }
-        else memcpy(img.data(),  rgb0.data, img.width()*img.height()*sizeof(T));
-
-    //memcpy(depthimg.data(), (ushort*)depth160.data , w_depth*h_depth*sizeof(ushort));
-    memcpy(depthimg.data(), (float*)depth32.data , w_depth*h_depth*sizeof(float));
-    timePCD = ((double)getTickCount() - timePCD)/getTickFrequency();
-    //boost::this_thread::sleep( boost::posix_time::milliseconds(10) );
-    std::cout << " TIME ACQUIRE " << timePCD << std::endl;
+    //memcpy(depthimg.data(), (float*)depth32.data , widthd*heightd*sizeof(float));
     }
 
 }
@@ -366,30 +315,66 @@ void getCorners(Vec<8,Vector3> &c) // get image corners
 
 void draw(const core::visual::VisualParams* vparams)
     {
-        /*glPushAttrib( GL_LIGHTING_BIT | GL_ENABLE_BIT | GL_LINE_BIT );
-        glPushMatrix();
+    GLfloat projectionMatrixData[16];
+    glGetFloatv(GL_PROJECTION_MATRIX, projectionMatrixData);
+    GLfloat modelviewMatrixData[16];
+    glGetFloatv(GL_MODELVIEW_MATRIX, modelviewMatrixData);
 
-        if (drawBB.getValue())
-        {
-            const float color[]= {1.,0.5,0.5,0.}, specular[]= {0.,0.,0.,0.};
-            glMaterialfv(GL_FRONT_AND_BACK,GL_AMBIENT_AND_DIFFUSE,color);
-            glMaterialfv(GL_FRONT_AND_BACK,GL_SPECULAR,specular);
-            glMaterialf(GL_FRONT_AND_BACK,GL_SHININESS,0.0);
-            glColor4fv(color);
-            glLineWidth(2.0);
+    std::cout << " width " << widthc << " " << heightc << std::endl;
 
-            Vec<8,Vector3> c;
-            getCorners(c);
-            glBegin(GL_LINE_LOOP);	glVertex3d(c[0][0],c[0][1],c[0][2]); glVertex3d(c[1][0],c[1][1],c[1][2]); glVertex3d(c[3][0],c[3][1],c[3][2]); glVertex3d(c[2][0],c[2][1],c[2][2]);	glEnd ();
-            glBegin(GL_LINE_LOOP);  glVertex3d(c[0][0],c[0][1],c[0][2]); glVertex3d(c[4][0],c[4][1],c[4][2]); glVertex3d(c[6][0],c[6][1],c[6][2]); glVertex3d(c[2][0],c[2][1],c[2][2]);	glEnd ();
-            glBegin(GL_LINE_LOOP);	glVertex3d(c[0][0],c[0][1],c[0][2]); glVertex3d(c[1][0],c[1][1],c[1][2]); glVertex3d(c[5][0],c[5][1],c[5][2]); glVertex3d(c[4][0],c[4][1],c[4][2]);	glEnd ();
-            glBegin(GL_LINE_LOOP);	glVertex3d(c[1][0],c[1][1],c[1][2]); glVertex3d(c[3][0],c[3][1],c[3][2]); glVertex3d(c[7][0],c[7][1],c[7][2]); glVertex3d(c[5][0],c[5][1],c[5][2]);	glEnd ();
-            glBegin(GL_LINE_LOOP);	glVertex3d(c[7][0],c[7][1],c[7][2]); glVertex3d(c[5][0],c[5][1],c[5][2]); glVertex3d(c[4][0],c[4][1],c[4][2]); glVertex3d(c[6][0],c[6][1],c[6][2]);	glEnd ();
-            glBegin(GL_LINE_LOOP);	glVertex3d(c[2][0],c[2][1],c[2][2]); glVertex3d(c[3][0],c[3][1],c[3][2]); glVertex3d(c[7][0],c[7][1],c[7][2]); glVertex3d(c[6][0],c[6][1],c[6][2]);	glEnd ();
-        }
+    std::stringstream imageString;
+    unsigned char *ptr_b = img.data(0,0,0,2), *ptr_g = img.data(0,0,0,1), *ptr_r = img.data(0,0,0,0);
+    for ( int siz = 0 ; siz<img.width()*img.height(); siz++)
+    {
+        imageString.write((const char*)ptr_r++, sizeof(T));
+        imageString.write((const char*)ptr_g++, sizeof(T));
+        imageString.write((const char*)ptr_b++, sizeof(T));
 
-        glPopMatrix ();
-        glPopAttrib();*/
+    }
+    // PERSPECTIVE
+    glMatrixMode(GL_PROJECTION);	//init the projection matrix
+    glPushMatrix();
+    glLoadIdentity();
+    glOrtho(0, 1, 0, 1, -1, 1);  // orthogonal view
+    glMatrixMode(GL_MODELVIEW);
+    glPushMatrix();
+    glLoadIdentity();
+
+    // BACKGROUND TEXTURING
+    //glDepthMask (GL_FALSE);		// disable the writing of zBuffer
+    glDisable(GL_DEPTH_TEST);
+    glEnable(GL_TEXTURE_2D);	// enable the texture
+    glDisable(GL_LIGHTING);		// disable the light
+    glBindTexture(GL_TEXTURE_2D, 0);  // texture bind
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, widthc, heightc, 0, GL_RGB, GL_UNSIGNED_BYTE, imageString.str().c_str());
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);	// Linear Filtering
+
+                                                                        // BACKGROUND DRAWING
+                                                                        //glEnable(GL_DEPTH_TEST);
+
+    glBegin(GL_QUADS); //we draw a quad on the entire screen (0,0 1,0 1,1 0,1)
+    glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+    glTexCoord2f(0, 1);		glVertex2f(0, 0);
+    glTexCoord2f(1, 1);		glVertex2f(1, 0);
+    glTexCoord2f(1, 0);		glVertex2f(1, 1);
+    glTexCoord2f(0, 0);		glVertex2f(0, 1);
+    glEnd();
+
+    //glEnable(GL_DEPTH_TEST);
+    glEnable(GL_LIGHTING);		// enable light
+    glDisable(GL_TEXTURE_2D);	// disable texture 2D
+    glEnable(GL_DEPTH_TEST);
+    //glDepthMask (GL_TRUE);		// enable zBuffer
+
+    glPopMatrix();
+    glMatrixMode(GL_PROJECTION);
+    glPopMatrix();
+    glMatrixMode(GL_MODELVIEW);
+
+
+    vparams->drawTool()->restoreLastState();
+
     }
 };
 
@@ -404,7 +389,6 @@ RealSenseCam::RealSenseCam() : Inherited()
         , drawBB(initData(&drawBB,false,"drawBB","draw bounding box"))
         , depthScale(initData(&depthScale,1,"depthScale","scale for the depth values, 1 for SR300, 10 for 435"))
     {
-
     globalRealSenseCamClassPointer = (void*) this;
     this->addAlias(&imageO, "inputImage");
     this->addAlias(&transform, "inputTransform");
@@ -432,7 +416,6 @@ RealSenseCam::~RealSenseCam()
 
 void RealSenseCam::initRaw()
 {
-
     pipe.start();
     rs2::frameset data;
     for (int i = 0; i < 100 ; i++)
@@ -447,19 +430,16 @@ void RealSenseCam::initRaw()
     color = data.get_color_frame(); // Find the color data
     }
 
-    int widthd = depth.get_width();
-    int heightd = depth.get_height();
+    widthd = depth.get_width();
+    heightd = depth.get_height();
 
-    int widthc = color.get_width();
-    int heightc = color.get_height();
-
-    //std::cout << " widthc " << widthc << " heigthc " << heightc << std::endl;
-    //std::cout << " widthd " << widthd << " heigthd " << heightd << std::endl;
+    widthc = color.get_width();
+    heightc = color.get_height();
 
     waDepth wdepth(this->depthImage);
     waTransform wdt(this->depthTransform);
     if(wdepth->isEmpty()) wdepth->getCImgList().push_back(CImg<dT>());
-    CImg<dT>& depthimg=wdepth->getCImg(0);
+    depthimg=wdepth->getCImg(0);
     depthimg.resize(widthd,heightd,1,1);
 
     wdt->setCamPos((Real)(wdepth->getDimensions()[0]-1)/2.0,(Real)(wdepth->getDimensions()[1]-1)/2.0); // for perspective transforms
@@ -476,7 +456,6 @@ void RealSenseCam::initRaw()
 
     cv::Mat rgb,depth8u,depth16, depth32;
 
-
     // Create depth image
 
     cv::Mat depth160( heightd, widthd, CV_16U, (void*)depth.get_data() );
@@ -484,33 +463,18 @@ void RealSenseCam::initRaw()
     depth16.convertTo(depth32, CV_32F, (float)1/8190);
     cv::Mat rgb0(heightc,widthc, CV_8UC3, (void*) color.get_data());
 
-    // Read the color buffer and display
-    int32_t w, h, w_depth, h_depth;
-
-    w = widthc;
-    h = heightc;
-    w_depth = widthd;
-    h_depth = heightd;
-
-    cv::Mat bgr_image;
-    cvtColor (rgb0, bgr_image, CV_RGB2BGR);
-
     //depth16.convertTo( depth8u, CV_8UC1, 255.0/1000 );
     //cv::imwrite("bgr.png", depth8u);
 
             if(img.spectrum()==3)
             {
-            unsigned char* rgb0 = (unsigned char*)bgr_image.data;
-            //unsigned char* rgb = (unsigned char*)color.get_data();
+            unsigned char* rgb = (unsigned char*)color.get_data();
             unsigned char *ptr_r = img.data(0,0,0,2), *ptr_g = img.data(0,0,0,1), *ptr_b = img.data(0,0,0,0);
-            for ( int siz = 0 ; siz<img.width()*img.height(); siz++)    { *(ptr_r++) = *(rgb0++); *(ptr_g++) = *(rgb0++); *(ptr_b++) = *(rgb0++);
+            for ( int siz = 0 ; siz<widthc*heightc; siz++)    { *(ptr_r++) = *(rgb++); *(ptr_g++) = *(rgb++); *(ptr_b++) = *(rgb++);
                         }
             }
-            else memcpy(img.data(),  bgr_image.data, img.width()*img.height()*sizeof(T));
 
-    memcpy(depthimg.data(), (float*)depth32.data , w_depth*h_depth*sizeof(float));
-
-    std::cout << " ok init raw " << std::endl;
+    memcpy(depthimg.data(), (float*)depth32.data , widthd*heightd*sizeof(float));
 
 }
 
@@ -534,16 +498,16 @@ void RealSenseCam::initAlign()
     rs2::video_frame color = processed.get_color_frame();
     rs2::depth_frame depth = processed.get_depth_frame();
 
-    int widthd = depth.get_width();
-    int heightd = depth.get_height();
+    widthd = depth.get_width();
+    heightd = depth.get_height();
 
-    int widthc = color.get_width();
-    int heightc = color.get_height();
+    widthc = color.get_width();
+    heightc = color.get_height();
 
     waDepth wdepth(this->depthImage);
     waTransform wdt(this->depthTransform);
     if(wdepth->isEmpty()) wdepth->getCImgList().push_back(CImg<dT>());
-    CImg<dT>& depthimg=wdepth->getCImg(0);
+    depthimg=wdepth->getCImg(0);
     depthimg.resize(widthd,heightd,1,1);
 
     wdt->setCamPos((Real)(wdepth->getDimensions()[0]-1)/2.0,(Real)(wdepth->getDimensions()[1]-1)/2.0); // for perspective transforms
@@ -552,7 +516,7 @@ void RealSenseCam::initAlign()
      waImage wimage(this->imageO);
      waTransform wit(this->transform);
     if(wimage->isEmpty()) wimage->getCImgList().push_back(CImg<T>());
-    CImg<T>& img = wimage->getCImg(0);
+    img = wimage->getCImg(0);
     img.resize(widthc,heightc,1,3);
 
     wit->setCamPos((Real)(wimage->getDimensions()[0]-1)/2.0,(Real)(wimage->getDimensions()[1]-1)/2.0); // for perspective transforms
@@ -564,44 +528,37 @@ void RealSenseCam::initAlign()
     cv::Mat depth160( heightd, widthd, CV_16U, (void*)depth.get_data() );
     depth16=depth160.clone();
     depth16.convertTo(depth32, CV_32F, (float)1/8190);
-    cv::Mat rgb0(heightc,widthc, CV_8UC3, (void*) color.get_data());
-
-    // Read the color buffer and display
-    int32_t w, h, w_depth, h_depth;
-
-    w = widthc;
-    h = heightc;
-    w_depth = widthd;
-    h_depth = heightd;
-
-    cv::Mat bgr_image;
-    cvtColor (rgb0, bgr_image, CV_RGB2BGR);
-
-    //depth16.convertTo( depth8u, CV_8UC1, 255.0/1000 );
-    //cv::imwrite("bgr.png", depth8u);
 
             if(img.spectrum()==3)
             {
-            unsigned char* rgb0 = (unsigned char*)bgr_image.data;
-            //unsigned char* rgb = (unsigned char*)color.get_data();
+            unsigned char* rgb = (unsigned char*)color.get_data();
             unsigned char *ptr_r = img.data(0,0,0,2), *ptr_g = img.data(0,0,0,1), *ptr_b = img.data(0,0,0,0);
-            for ( int siz = 0 ; siz<img.width()*img.height(); siz++)    { *(ptr_r++) = *(rgb0++); *(ptr_g++) = *(rgb0++); *(ptr_b++) = *(rgb0++);
-                        }
+                for ( int siz = 0 ; siz<widthc*heightc; siz++)
+                {
+                    *(ptr_r++) = *(rgb++);
+                    *(ptr_g++) = *(rgb++);
+                    *(ptr_b++) = *(rgb++);
+                }
             }
-            else memcpy(img.data(),  bgr_image.data, img.width()*img.height()*sizeof(T));
 
-    memcpy(depthimg.data(), (float*)depth32.data , w_depth*h_depth*sizeof(float));
-
-    std::cout << " ok init align " << std::endl;
-
+    //memcpy(depthimg.data(), (float*)depth32.data , widthd*heightd*sizeof(float));
 
 }
 
 void RealSenseCam::init()
 {
 
-   if(this->depthMode.getValue()==0) initRaw();
-   else initAlign();
+   if(this->depthMode.getValue()==0)
+   {
+       initRaw();
+       //acquireRaw();
+   }
+   else
+   {
+       initAlign();
+       //acquireAligned();
+   }
+
 
 }
 
